@@ -2,7 +2,7 @@ import time
 import logging
 from multiprocessing import Process
 import paho.mqtt.client as mqtt
-from helpers import make_event
+from skabenclient.helpers import make_event
 
 import skabenproto as sk
 
