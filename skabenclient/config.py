@@ -42,5 +42,5 @@ class Config:
 
     def update(self, payload):
         """ Update config with payload """
-        new_values = {k: v for k, v in payload if not k.startswith('_')}
+        new_values = {k: v for k, v in payload.items() if not k.startswith('_')}
         self.__dict__.update(**new_values)
