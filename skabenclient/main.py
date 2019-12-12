@@ -1,7 +1,7 @@
 import time
 from threading import Thread
-from mqtt_client import CDLClient
-from handlers.base import MQTTManager
+from skabenclient.mqtt_client import CDLClient
+from skabenclient.managers import MQTTManager
 
 
 class Router(Thread):
