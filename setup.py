@@ -6,7 +6,7 @@ with open("README.md", 'r') as f:
 
 setup(
     name='skabenclient',
-    version='0.3.1',
+    version='0.3.2',
     description='SKABEN client ',
     license="MIT",
     long_description=long_description,
