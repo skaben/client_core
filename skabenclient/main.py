@@ -1,9 +1,7 @@
 import time
 from threading import Thread
-import multiprocessing as mp
 from mqtt_client import CDLClient
 from handlers.base import MQTTManager
-from skabenclient.helpers import get_mac, get_ip
 
 
 class Router(Thread):
@@ -62,10 +60,6 @@ def start_app(config,
               **kwargs):
 
     config.update({
-        'uid': get_mac(config['iface']),
-        'ip': get_ip(config['iface']),
-        'q_int': mp.Queue(),
-        'q_ext': mp.Queue(),
         'device_handler': device_handler,
         'event_handler': event_handler
     })

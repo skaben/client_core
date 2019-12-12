@@ -1,6 +1,8 @@
 import os
 import yaml
 import logging
+import multiprocessing as mp
+from skabenclient.helpers import get_mac, get_ip
 
 
 class Config:
@@ -19,6 +21,13 @@ class Config:
             except Exception:
                 raise
 
+        self.update({
+            'uid': get_mac(self.iface),
+            'ip': get_ip(self.iface),
+            'q_int': mp.Queue(),
+            'q_ext': mp.Queue()
+        })
+
     def logger(self, file_path=None, log_level=None):
         """ Make logger """
         if not file_path:
@@ -33,4 +42,5 @@ class Config:
 
     def update(self, payload):
         """ Update config with payload """
-        self.__dict__.update({k: v for k, v in payload if not k.startswith('_')})
+        new_values = {k: v for k, v in payload if not k.startswith('_')}
+        self.__dict__.update(**new_values)
