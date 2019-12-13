@@ -6,7 +6,7 @@ with open("README.md", 'r') as f:
 
 setup(
     name='skabenclient',
-    version='0.3.2',
+    version='0.4.0',
     description='SKABEN client ',
     license="MIT",
     long_description=long_description,
@@ -15,6 +15,7 @@ setup(
     url="dungeon.tangled.link",
     packages=['skabenclient'], 
     install_requires=[
+        'pygame==1.9.6',
         'paho-mqtt==1.4.0',
         'pyaml==18.11.0',
         'netifaces==0.10.9',
