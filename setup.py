@@ -15,7 +15,7 @@ setup(
     url="dungeon.tangled.link",
     packages=['skabenclient'], 
     install_requires=[
-        'pygame==1.9.6',
+        'pygame>=1.9.4',
         'paho-mqtt==1.4.0',
         'pyaml==18.11.0',
         'netifaces==0.10.9',
