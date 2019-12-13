@@ -10,7 +10,7 @@ class SoundLoader:
 
     def __init__(self, sound_dir, channel_list):
         self.enabled = None
-        self.sound = {}
+        self.channels = {}
         try:
             mixer.init()
             time.sleep(.2)
@@ -21,9 +21,10 @@ class SoundLoader:
         for r, d, f in os.walk(sound_dir):
             for filename in f:
                 self.sound[filename] = self._snd(filename)
+                vars()[filename.split('.')[0]] = self.sound[filename]
         # TODO: check for maximum number of channels available
         for idx, ch in enumerate(channel_list, 1):
-            vars()[f"channel_{ch}"] = mixer.Channel(idx)
+            self.channels[ch] = mixer.Channel(idx)
 
     def _snd(fname, volume=None):
         if not volume:
