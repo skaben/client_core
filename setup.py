@@ -16,10 +16,10 @@ setup(
     packages=['skabenclient'], 
     install_requires=[
         'pygame>=1.9.4',
-        'paho-mqtt==1.4.0',
-        'pyaml==18.11.0',
-        'netifaces==0.10.9',
-        'skabenproto'  
+        'paho-mqtt>=1.4.0',
+        'pyaml>=19.0.0',
+        'netifaces>=0.10.9',
+        'skabenproto>=1.10'
     ],
     dependency_links=[
         'https://pypi.fury.io/zerthmonk/'
