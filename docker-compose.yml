@@ -1,0 +1,12 @@
+version: "3"
+
+services:
+  skb_test:
+    image: skabenclient_test:latest
+    build:
+      context: .
+    volumes:
+      - ./skabenclient:/skabenclient
+      - ./testing:/testing
+    command: sh -c
+      "/testing/start.sh"
