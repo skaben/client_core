@@ -35,9 +35,19 @@ class Config:
         if not log_level:
             log_level = logging.DEBUG
         file_path = os.path.join(self.root, file_path)
-        FORMAT = '%(asctime)s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s'
+
         logger = logging.getLogger('main')
-        logger.basicConfig(filename=file_path, level=log_level, format=FORMAT)
+        FORMAT = '%(asctime)s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s'
+        log_format = logging.Formatter(FORMAT)
+        # set handlers
+        fh = logging.FileHandler(filename=file_path)
+        stream = logging.StreamHandler()
+        # assign
+        for handler in (fh, stream):
+            handler.setFormatter(log_format)
+            handler.setLevel(log_level)
+            logger.addHandler(handler)
+        logger.setLevel(log_level)
         return logger
 
     def update(self, payload):
