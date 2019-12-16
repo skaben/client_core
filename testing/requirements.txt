@@ -1,0 +1,10 @@
+--index-url https://pypi.fury.io/zerthmonk/
+--extra-index-url https://pypi.org/simple/
+
+pygame>=1.9.4
+paho-mqtt>=1.4.0
+pyaml>=19.0.0
+netifaces>=0.10.9
+skabenproto>=1.10
+pytest
+flake8
