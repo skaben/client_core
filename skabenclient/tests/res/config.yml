@@ -1,3 +1,2 @@
-cfig: test
+dev_type: test
 iface: eth0
-name: main
