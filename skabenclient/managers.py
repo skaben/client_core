@@ -19,10 +19,10 @@ class BaseManager:
 
     def __init__(self, config):
         self.config = config
-        self.q_int = config.get('q_int')
+        self.q_int = config.q_int
         if not self.q_int:
             raise Exception('internal queue not declared')
-        self.q_ext = config.get('q_ext')
+        self.q_ext = config.q_ext
         if not self.q_ext:
             raise Exception('external (to mqtt) queue not declared')
         # keepalive TS management
@@ -31,14 +31,14 @@ class BaseManager:
             with open(self.ts_fname, 'w') as fh:
                 fh.write('0')
         self.ts = self._last_ts()
-        self.dev_type = config.get('dev_type')
-        self.uid = config.get('uid')
+        self.dev_type = config.dev_type
+        self.uid = config.uid
         self.reply_channel = self.dev_type + 'ask'
 
     def get_ip_addr(self):
         """ Get IP address by interface name """
         try:
-            iface = self.config.get('iface')
+            iface = self.config.iface
             self.ip = netif.ifaddresses(iface)[netif.AF_INET][0]['addr']
             return self.ip
         except Exception:
@@ -157,10 +157,10 @@ class DBManager(BaseManager):
         self.conn.row_factory = sqlite3.Row
         # get db structure based on device type
         try:
-            self.tables = self.structure.get(config.get('dev_type'))
+            self.tables = self.structure.get(config.dev_type)
         except Exception:
             logging.exception('cannot determine database structure for '
-                              'device type {}'.format(config.get('dev_type')))
+                              'device type {}'.format(config.dev_type))
             raise
 
     def _istable(self, table_name):
@@ -303,7 +303,7 @@ class DeviceManager(DBManager):
 
     def __init__(self, config):
         super().__init__(config)
-        self.dev = config.get('end_device')
+        self.dev = config.device
         if not self.dev:
             raise Exception('missing end device')
         # send IP on start - NOPE, NOPE, NOPE
