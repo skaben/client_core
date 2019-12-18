@@ -32,8 +32,14 @@ class SoundLoader:
             self.channels[ch] = mixer.Channel(idx)
 
     def play(self, sound, channel, **kwargs):
+        if not self.enabled:
+            # stays silent
+            return
         try:
             self.channels.get(channel).play(self.sound.get(sound), **kwargs)
+            delay = kwargs.get('delay')
+            if delay:
+                time.sleep(delay)
         except Exception:
             raise
 
@@ -46,15 +52,16 @@ class SoundLoader:
             raise
 
     def fadeout(self, fadeout_time, channels=None):
+        mixer = list()
         if not channels:
             mixer = list(self.channels.values())
-        elif isinstance(channels, str):
-            mixer = (channels,)
+        elif isinstance(channels, (int, str)):
+            mixer.append(str(channels))
         else:
-            mixer = list(channels)
+            mixer.extend(channels)
         try:
             for ch in mixer:
-                ch.fadeout(fadeout_time)
+                self.channels[ch].fadeout(fadeout_time)
         except Exception:
             raise
 
