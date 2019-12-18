@@ -10,7 +10,9 @@ class SoundLoader:
 
     enabled = None
 
-    def __init__(self, sound_dir, channel_list):
+    def __init__(self, sound_dir, channel_list=None):
+        if not channel_list:
+            channel_list = ['bg', 'fg', 'fx']
         self.sound = {}
         self.channels = {}
         try:
@@ -23,12 +25,38 @@ class SoundLoader:
         for r, d, f in os.walk(sound_dir):
             for filename in f:
                 fpath = os.path.join(r, filename)
-                self.sound[filename] = self._snd(fpath)
-                vars()[filename.split('.')[0]] = self.sound[filename]
+                self.sound[filename.split('.')[0]] = self._snd(fpath)
 
         # TODO: check for maximum number of channels available
         for idx, ch in enumerate(channel_list, 1):
             self.channels[ch] = mixer.Channel(idx)
+
+    def play(self, sound, channel, **kwargs):
+        try:
+            self.channels.get(channel).play(self.sound.get(sound), **kwargs)
+        except Exception:
+            raise
+
+    def stop(self, channel):
+        try:
+            ch = self.channels.get(channel)
+            if ch.get_busy():
+                ch.stop()
+        except Exception:
+            raise
+
+    def fadeout(self, fadeout_time, channels=None):
+        if not channels:
+            mixer = list(self.channels.values())
+        elif isinstance(channels, str):
+            mixer = (channels,)
+        else:
+            mixer = list(channels)
+        try:
+            for ch in mixer:
+                ch.fadeout(fadeout_time)
+        except Exception:
+            raise
 
     def _snd(fname, volume=None):
         if not volume:

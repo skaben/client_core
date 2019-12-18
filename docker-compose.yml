@@ -2,7 +2,6 @@ version: "3"
 
 services:
   skb_test:
-    image: skabenclient_test:latest
     build:
       context: .
     volumes:
