@@ -77,7 +77,7 @@ def start_app(config,
     try:
         client.start()
         router.start()
-        config['end_device'].run()
+        config['device_handler'].run()
     except Exception:
         raise
     finally:

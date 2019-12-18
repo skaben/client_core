@@ -38,5 +38,5 @@ def test_sound_loader(create_test_sounds, monkeypatch):
     monkeypatch.setattr(pg.mixer, "Channel", mock_mixer.channel)
     loader = SoundLoader(snd['root'], channel_list)
 
-    assert list(loader.sound) == snd['files'], 'missing files in loader'
-    assert list(loader.channels) == channel_list, 'missing channels in loader'
+    assert list(loader.sound) == [fn.split(".")[0] for fn in snd['files']], \
+        'missing sound files in loader'
