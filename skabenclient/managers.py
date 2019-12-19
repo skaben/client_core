@@ -1,4 +1,5 @@
 import os
+import yaml
 import logging
 import sqlite3
 import netifaces as netif
@@ -137,6 +138,44 @@ class MQTTManager(BaseManager):
         return '<PacketManager>'
 
 
+class PlotManager:
+    """ Managing device configuration """
+
+    config = None
+
+    def __init__(self, config_path):
+        self.config_path = config_path
+
+    def from_file(self, config_path=None):
+        if not config_path:
+            config_path = self.config_path
+        with open(config_path, 'r') as fh:
+            try:
+                return yaml.load(fh, Loader=yaml.BaseLoader)
+            except Exception:
+                raise
+
+    def from_dict(self, cfg_dict):
+        self.config = cfg_dict
+
+    def write(self, config_path=None):
+        if not self.config:
+            raise Exception('nothing to write, current config is missing')
+        if not config_path:
+            config_path = self.config_path
+        with open(config_path, 'w') as fh:
+            try:
+                fh.write(yaml.dump(self.config))
+            except Exception:
+                raise
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *err):
+        return
+
+
 class DBManager(BaseManager):
     """
         Database interface for basic CRUD operations
@@ -146,15 +185,19 @@ class DBManager(BaseManager):
     tables = list()
 
     structure = {
-        'term': ('term', 'term_menu', 'term_text'),
-        'lock': ('lock',),
+        'test': ('test',),
+    # extend    'term': ('term', 'term_menu', 'term_text'),
+    # extend    'lock': ('lock',),
     }
 
     def __init__(self, config):
         super().__init__(config)
-        self.conn = sqlite3.connect(config['db_name'],
-                                    detect_types=sqlite3.PARSE_DECLTYPES)
-        self.conn.row_factory = sqlite3.Row
+        try:
+            self.conn = sqlite3.connect(config.db_name,
+                                        detect_types=sqlite3.PARSE_DECLTYPES)
+            self.conn.row_factory = sqlite3.Row
+        except sqlite3.OperationalError as e:
+            logging.exception(f'{e}\nfilepath: {config.db_name}')
         # get db structure based on device type
         try:
             self.tables = self.structure.get(config.dev_type)
@@ -179,16 +222,15 @@ class DBManager(BaseManager):
                 WHERE name = ? """.format(table_name)
         c.execute(q, (column_name, ))
         res = c.fetchall()
-        if res and res > 0:
+        if res:
             return True
 
     def _column_list(self, table_name):
         """ Get table structure """
         columns = list()
         c = self.conn.cursor()
-        self._istable(table_name)
-        q = """ PRAGMA table_info(%s) """ % table_name
-        c.execute(q)
+        q = """ PRAGMA table_info(?) """
+        c.execute(q, (table_name,))
         res = c.fetchall()
         for r in res:
             if r['name'] != 'id':
@@ -297,6 +339,10 @@ class DBManager(BaseManager):
                               % table_name)
             self.rollback()
             raise
+
+    def __exit__(self, *err):
+        """ Closing DB connection on exit """
+        self.conn.close()
 
 
 class DeviceManager(DBManager):

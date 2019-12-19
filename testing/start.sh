@@ -4,4 +4,4 @@ app=/skabenclient
 
 . /venv/bin/activate
 flake8 $app
-pytest $app
+pytest -vs $app

@@ -4,6 +4,10 @@ MAINTAINER zerthmonk
 ENV PYTHONUBUFFERED=1
 ENV PATH="/venv/bin:$PATH"
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    sqlite3
+
 COPY ./testing/requirements.txt /requirements.txt
 
 ENV VENV="/venv"
