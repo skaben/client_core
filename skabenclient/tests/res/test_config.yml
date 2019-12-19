@@ -1,0 +1,9 @@
+device: testing
+list_one:
+- one
+- two
+- 3
+list_two:
+- this
+- is
+- conf
