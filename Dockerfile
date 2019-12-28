@@ -9,6 +9,9 @@ RUN apt-get update && \
     sqlite3
 
 COPY ./testing/requirements.txt /requirements.txt
+COPY ./requirements.txt /temp_requirements.txt
+RUN cat /temp_requirements.txt >> /requirements.txt
+RUN rm /temp_requirements.txt
 
 ENV VENV="/venv"
 RUN python -m venv $VENV
