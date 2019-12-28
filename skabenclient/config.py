@@ -1,31 +1,88 @@
 import os
 import yaml
+import time
 import logging
+from filelock import Timeout, FileLock
 import multiprocessing as mp
 from skabenclient.helpers import get_mac, get_ip
 
-
 class Config:
 
-    def __init__(self, conf_path=None):
+    file_lock = None
+    filtered_keys = list()
+    root = os.path.dirname(os.path.realpath(__file__))
 
-        self.root = os.path.dirname(os.path.realpath(__file__))
+    def __init__(self, config_path):
+        self.data = dict()
+        self.config_path = config_path
+        fname = os.path.basename(os.path.normpath(self.config_path)) + '.lock'
+        self.flock = FileLock(os.path.join(os.path.dirname(self.config_path), fname), timeout=1)
+        self.update(self.read())
 
-        if not conf_path:
-            conf_path = os.path.join('conf', 'config.yml')
+    def read(self):
+        """ Reads from config file """
+        try:
+            with self.flock:
+                with open(self.config_path, 'r') as fh:
+                    return yaml.load(fh, Loader=yaml.BaseLoader)
+        except Timeout:
+            # todo: handling second readding try
+            raise
+        except FileNotFoundError:
+            raise
+        except yaml.YAMLError:
+            raise
+        except Exception:
+            raise
+        finally:
+            self.flock.release(force=True)
 
-        with open(os.path.join(os.getcwd(), conf_path)) as f:
-            try:
-                yaml_conf = yaml.load(f, Loader=yaml.BaseLoader)
-                self.update(yaml_conf)
-            except Exception:
-                raise
+    def write(self):
+        """ Writes to config file """
+        config = self.get_values(self.__dict__)
+        try:
+            with self.flock:
+                with open(self.config_path, 'w') as fh:
+                    fh.write(yaml.dump(config))
+        except Timeout:
+            # todo: handling second reading try
+            raise
+        except Exception:
+            raise
+        finally:
+            self.flock.release(force=True)
+
+    def update(self, payload):
+        """ Updates local namespace from payload with basic filtering """
+        self.data.update(self.get_values(payload))
+        return self.data
+
+    def get_values(self, payload):
+        """ Filter keys starting with underscore and by filtered keys list """
+        cfg = {k: v for k, v in payload.items()
+               if not k.startswith('_')
+               and k not in self.filtered_keys}
+        return cfg
+
+
+class SystemConfig(Config):
+
+    """ Basic app configuration """
+
+    def __init__(self, config_path=None):
+        if not config_path:
+            config_path = os.path.join(self.root, 'conf', 'config.yml')
+        super().__init__(config_path)
+        iface = self.data.get('iface')
+
+        if not iface:
+            raise Exception('network interface missing in config')
 
         self.update({
-            'uid': get_mac(self.iface),
-            'ip': get_ip(self.iface),
+            'uid': get_mac(iface),
+            'ip': get_ip(iface),
             'q_int': mp.Queue(),
-            'q_ext': mp.Queue()
+            'q_ext': mp.Queue(),
         })
 
     def logger(self, file_path=None, log_level=None):
@@ -50,7 +107,51 @@ class Config:
         logger.setLevel(log_level)
         return logger
 
-    def update(self, payload):
-        """ Update config with payload """
-        new_values = {k: v for k, v in payload.items() if not k.startswith('_')}
-        self.__dict__.update(**new_values)
+
+class DeviceConfig(Config):
+
+    """
+        Local data persistent storage operations
+        ! use only in device handlers !
+    """
+
+    default_config = {
+        'dev_type': 'not_used',
+    }
+
+    filtered_keys = ['message']  # this keys will not be stored in config file
+
+    def __init__(self, config_path=None):
+        if not config_path:
+            config_path = os.path.join(self.root, 'conf', 'running.yml')
+        super().__init__(config_path)
+
+    def load(self):
+        """ Load and update configuration state from file """
+        return self.update(self.read())
+
+    def save(self, payload=None):
+        """ Update current state from custom payload and save to file """
+        if payload:
+            self.update(payload)
+        return self.write()
+
+    def get_running(self):
+        """ Get current config """
+        data = self.get_values(self.data)
+        if not data:
+            return self.set_default()
+        else:
+            return data
+
+    def set_default(self):
+        """ Reset config state to defaults """
+        return self.update(self.default_config)
+
+    def get(self, key, arg=None):
+        """ Get compatibility wrapper """
+        return self.data.get(key, arg)
+
+    def set(self, key, val):
+        """ Set compatibility wrapper """
+        return self.update({key: val})
