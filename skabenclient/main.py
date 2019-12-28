@@ -55,29 +55,30 @@ class Router(Thread):
 
 
 def start_app(config,
-              device_handler,
+              device,
               event_handler,
               **kwargs):
 
     config.update({
-        'device_handler': device_handler,
+        'device': device,
         'event_handler': event_handler
     })
 
-    config.update(**kwargs)
+    config.update(kwargs)
+    data = config.data
 
-    client = CDLClient(q_ext=config.q_ext,
-                       q_int=config.q_int,
-                       broker_ip=config.broker_ip,
-                       dev_type=config.dev_type,
-                       uid=config.uid)
+    client = CDLClient(q_ext=data['q_ext'],
+                       q_int=data['q_int'],
+                       broker_ip=data['broker_ip'],
+                       dev_type=data['dev_type'],
+                       uid=data['uid'])
 
     router = Router(config)
 
     try:
-        client.start()
-        router.start()
-        config['device_handler'].run()
+        client.start()  # MQTT client
+        router.start()  # message routing
+        config['device'].run()  # device interface
     except Exception:
         raise
     finally:
