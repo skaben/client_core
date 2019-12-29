@@ -2,55 +2,85 @@ import os
 import yaml
 import time
 import logging
-from filelock import Timeout, FileLock
 import multiprocessing as mp
 from skabenclient.helpers import get_mac, get_ip
+from skabenclient.loaders import get_yaml_loader
+
+ExtendedLoader = get_yaml_loader()
+
+
+class FileLock:
+
+    locked = None
+
+    def __init__(self, file_to_lock, timeout=1):
+        self.timeout = timeout
+        self.lock_path = os.path.abspath(file_to_lock) + '.lock'
+
+    def acquire(self):
+        """ """
+        idx = 0
+        while not self.locked:
+            try:
+                time.sleep(.1)
+                with open(self.lock_path, 'w+') as fl:
+                    content = fl.read().strip()
+                    if content == '' or int(content) == 0:
+                        fl.write('1')
+                        self.locked = True
+                idx += .1
+                if idx >= self.timeout:
+                    raise Exception('failed to acquire file lock by timeout')
+            except Exception:
+                raise
+
+    def release(self):
+        """ Release file lock """
+        with open(self.lock_path, 'w') as fl:
+            fl.write('0')
+        self.locked = None
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *err):
+        self.release()
+        return
+
 
 class Config:
 
-    file_lock = None
     filtered_keys = list()
     root = os.path.dirname(os.path.realpath(__file__))
 
     def __init__(self, config_path):
         self.data = dict()
         self.config_path = config_path
-        fname = os.path.basename(os.path.normpath(self.config_path)) + '.lock'
-        self.flock = FileLock(os.path.join(os.path.dirname(self.config_path), fname), timeout=1)
         self.update(self.read())
 
     def read(self):
         """ Reads from config file """
         try:
-            with self.flock:
+            with FileLock(self.config_path):
                 with open(self.config_path, 'r') as fh:
-                    return yaml.load(fh, Loader=yaml.BaseLoader)
-        except Timeout:
-            # todo: handling second readding try
-            raise
+                    return yaml.load(fh, Loader=ExtendedLoader)
         except FileNotFoundError:
             raise
         except yaml.YAMLError:
             raise
         except Exception:
             raise
-        finally:
-            self.flock.release(force=True)
 
     def write(self):
         """ Writes to config file """
-        config = self.get_values(self.__dict__)
+        config = self.get_values(self.data)
         try:
-            with self.flock:
+            with FileLock(self.config_path):
                 with open(self.config_path, 'w') as fh:
                     fh.write(yaml.dump(config))
-        except Timeout:
-            # todo: handling second reading try
-            raise
         except Exception:
             raise
-        finally:
-            self.flock.release(force=True)
 
     def update(self, payload):
         """ Updates local namespace from payload with basic filtering """
@@ -127,11 +157,11 @@ class DeviceConfig(Config):
         super().__init__(config_path)
 
     def load(self):
-        """ Load and update configuration state from file """
+        """ Load and apply state from file """
         return self.update(self.read())
 
     def save(self, payload=None):
-        """ Update current state from custom payload and save to file """
+        """ Apply and save persistent state """
         if payload:
             self.update(payload)
         return self.write()
@@ -145,8 +175,8 @@ class DeviceConfig(Config):
             return data
 
     def set_default(self):
-        """ Reset config state to defaults """
-        return self.update(self.default_config)
+        """ Reset config state to defaults without saving to file """
+        self.data = self.default_config
 
     def get(self, key, arg=None):
         """ Get compatibility wrapper """
