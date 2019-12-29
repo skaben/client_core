@@ -1,7 +1,22 @@
 import os
 import time
+import yaml
 import pygame as pg
 import pygame.mixer as mixer
+
+
+def get_yaml_loader():
+
+    class Loader(yaml.SafeLoader):
+        """ Yaml Loader extended """
+        def construct_python_tuple(self, node):
+            return tuple(self.construct_sequence(node))
+
+    Loader.add_constructor(
+        'tag:yaml.org,2002:python/tuple',
+        Loader.construct_python_tuple)
+
+    return Loader
 
 
 class SoundLoader:
