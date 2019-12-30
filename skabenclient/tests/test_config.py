@@ -6,7 +6,7 @@ import multiprocessing as mp
 import logging
 
 from skabenclient.tests.conftest import _iface
-from skabenclient.config import Config, SystemConfig, DeviceConfig
+from skabenclient.config import Config, SystemConfig, DeviceConfig, FileLock
 from skabenclient.loaders import get_yaml_loader
 
 _sysconfig_dict = {
@@ -125,6 +125,32 @@ def test_config_device_set_default(get_config, config_dict):
     assert new_conf == cfg.default_config, 'failed to load default config'
 
 
-def test_config_flock(get_config, monkeypatch):
+def test_file_lock_context(get_config, monkeypatch):
     cfg = get_config(DeviceConfig, _devconfig.get('str'))
-    monkeypatch.setattr(cfg, 'save', lambda x: time.sleep(10))
+    file_lock = FileLock(cfg.config_path)
+    # acquire lock context
+    with file_lock:
+        with open(file_lock.lock_path) as fh:
+            content = fh.read().strip()
+    # lock released, check lockfile content
+    with open(file_lock.lock_path) as fh:
+        no_lock_content = fh.read().strip()
+
+    assert content == '1', 'value not writed to lockfile'
+    assert no_lock_content == '0', 'value not released'
+    assert file_lock.locked is None, "not released"    
+    assert file_lock.lock_path == f"{cfg.config_path}.lock"
+
+
+def test_file_lock_busy(get_config, monkeypatch):
+    cfg = get_config(DeviceConfig, _devconfig.get('str'))
+    # just ignore time sleep
+    monkeypatch.setattr(time, 'sleep', lambda x: None)
+    file_lock = FileLock(cfg.config_path, timeout=.1)
+    with file_lock:
+        res = file_lock.acquire()
+        with pytest.raises(Exception):
+            assert cfg.write()
+            assert cfg.read()
+
+    assert res == None, 'lock acquired but should not'
