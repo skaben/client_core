@@ -25,9 +25,11 @@ class FileLock:
                 time.sleep(.1)
                 with open(self.lock_path, 'w+') as fl:
                     content = fl.read().strip()
-                    if content == '' or int(content) == 0:
+                    print(content)
+                    if content != '1':
                         fl.write('1')
                         self.locked = True
+                        return self.locked
                 idx += .1
                 if idx >= self.timeout:
                     raise Exception('failed to acquire file lock by timeout')
