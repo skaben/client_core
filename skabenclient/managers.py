@@ -4,7 +4,7 @@ import netifaces as netif
 
 import skabenproto as sk
 from skabenclient.helpers import make_event
-from skabenclient.config import DeviceConfig, SystemConfig
+from skabenclient.config import DeviceConfig
 
 
 class BaseManager:
@@ -16,6 +16,7 @@ class BaseManager:
 
     def __init__(self, config):
         self.config = config.data
+        self.logger = config.logger()
         self.q_int = self.config.get('q_int')
         if not self.q_int:
             raise Exception('internal queue not declared')
@@ -134,13 +135,13 @@ class MQTTManager(BaseManager):
         return '<PacketManager>'
 
 
-class DeviceManager(BaseManager):
+class EventManager(BaseManager):
 
     filtered_keys = ['id', 'uid']
 
     def __init__(self, config):
-        super(BaseManager).__init__(config)
-        self.dev = DeviceConfig(config.device_file)
+        super().__init__(config)
+        self.dev_conf = config.get('device').config
 
     def manage(self, event):
         if event.cmd == 'update':
@@ -149,32 +150,34 @@ class DeviceManager(BaseManager):
             task_id = event.data.get('task_id', '12345')
             response = 'ACK'
             try:
-                self.dev.save(event.data)
+                self.dev_conf.save(event.data)
             except Exception:
                 response = 'NACK'
                 logging.exception('cannot apply new config')
             finally:
-                self.confirm_update(task_id, response)
+                return self.confirm_update(task_id, response)
         elif event.cmd == 'send':
+            # deprecated
             # send to server without local db update
             logging.debug('event is {} - sending data to server'.format(event))
-            self.send_config(event.data)
+            return self.send_config(event.data)
         elif event.cmd == 'input':
             # update local db, send to server
             logging.debug('event is {} - input: {}'.format(event, event.data))
             if event.data:
-                self.dev.save(event.data)
-                self.send_config(event.data)
+                self.dev_conf.save(event.data) # already saved
+                return self.send_config(event.data)
             else:
                 logging.error('missing data from event: {}'.format(event))
         elif event.cmd == 'reload':
             # just reload device with current plot
             logging.debug('event is {} - reloading device'.format(event))
-            self.dev.load()
+            return self.dev_conf.load()
         else:
             logging.error('bad event {}'.format(event))
 
     def send_config(self, data):
+        """ Send config to server """
         if not data or not isinstance(data, dict):
             logging.error('missing data to send')
             return
@@ -190,8 +193,8 @@ class DeviceManager(BaseManager):
             encoded = p.encode(packet, self.ts)
             self.q_ext.put(encoded)
 
-    def remote_request(self, keys=None):
-        current = self.dev.get_running()
+    def config_reply(self, keys=None):
+        current = self.dev_conf.get_running()
         if keys:
             payload = {'request': tuple(k for k in current if k in keys)}
         else:
@@ -206,8 +209,9 @@ class DeviceManager(BaseManager):
             self.q_ext.put(encoded)
 
     def confirm_update(self, task_id, packet_type='ACK'):
-        # confirm to server that we received and applied update
-        # should be initialized only after device handler success
+        """ Confirm to server that we received and applied config
+            should be initialized only after device handler success
+        """
         with sk.PacketEncoder() as p:
             packet = p.load(packet_type,
                             dev_type=self.reply_channel,
@@ -216,3 +220,9 @@ class DeviceManager(BaseManager):
             encoded = p.encode(packet, self.ts)
             self.q_ext.put(encoded)
 
+#
+#    def send_config_internal(self, msg):
+#        """ Deprecated because of class merge """
+#        event = make_event('device', 'send', msg)
+#        self.q_int.put(event)
+#        return f'sending message: {msg}'
