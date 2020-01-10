@@ -9,12 +9,6 @@ from skabenclient.tests.conftest import _iface
 from skabenclient.config import Config, SystemConfig, DeviceConfig, FileLock
 from skabenclient.loaders import get_yaml_loader
 
-_sysconfig_dict = {
-    "test": "test",
-    "name": "main",
-    "iface": _iface()
-}
-
 _devconfig = {'str': {'device': 'testing',
                       'list_one': ['one', 'two', {'3': 'number'}],
                       'list_two': [('this', 'is', 'not'), 'is', 'conf']},
@@ -31,8 +25,8 @@ def test_config_init(get_config):
     assert isinstance(cfg, Config), 'bad instancing'
 
 
-def test_config_write(get_config):
-    cfg = get_config(Config, _sysconfig_dict)
+def test_config_write(get_config, default_config):
+    cfg = get_config(Config, default_config('sys'))
 
     try:
         cfg.write()
@@ -58,9 +52,10 @@ def test_config_update(get_config):
     assert cfg.data.get('name') == "new_name", "config was not updated"
 
 
-def test_config_system_init(get_config):
-    cfg = get_config(SystemConfig, _sysconfig_dict)
-    test_keys = ['q_int', 'q_ext', 'ip', 'uid'] + list(_sysconfig_dict.keys())
+def test_config_system_init(get_config, default_config):
+    config = default_config('sys')
+    cfg = get_config(SystemConfig, config)
+    test_keys = ['q_int', 'q_ext', 'ip', 'uid'] + list(config.keys())
     conf_keys = list(cfg.data.keys())
     test_keys.sort()
     conf_keys.sort()
@@ -68,8 +63,8 @@ def test_config_system_init(get_config):
     assert test_keys == conf_keys, 'bad config data'
 
 
-def test_config_system_logger(get_config):
-    cfg = get_config(SystemConfig, _sysconfig_dict)
+def test_config_system_logger(get_config, default_config):
+    cfg = get_config(SystemConfig, default_config('sys'))
     logger = cfg.logger()
 
     assert logger.level == logging.DEBUG, "bad logging level"

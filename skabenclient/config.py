@@ -96,12 +96,21 @@ class Config:
                and k not in self.filtered_keys}
         return cfg
 
+    def get(self, key, arg=None):
+        """ Get compatibility wrapper """
+        return self.data.get(key, arg)
+
+    def set(self, key, val):
+        """ Set compatibility wrapper """
+        return self.update({key: val})
+
 
 class SystemConfig(Config):
 
     """ Basic app configuration """
 
     def __init__(self, config_path=None):
+        self.data = dict()
         if not config_path:
             config_path = os.path.join(self.root, 'conf', 'config.yml')
         super().__init__(config_path)
@@ -154,6 +163,7 @@ class DeviceConfig(Config):
     filtered_keys = ['message']  # this keys will not be stored in config file
 
     def __init__(self, config_path=None):
+        self.data = dict()
         if not config_path:
             config_path = os.path.join(self.root, 'conf', 'running.yml')
         super().__init__(config_path)
@@ -179,11 +189,3 @@ class DeviceConfig(Config):
     def set_default(self):
         """ Reset config state to defaults without saving to file """
         self.data = self.default_config
-
-    def get(self, key, arg=None):
-        """ Get compatibility wrapper """
-        return self.data.get(key, arg)
-
-    def set(self, key, val):
-        """ Set compatibility wrapper """
-        return self.update({key: val})

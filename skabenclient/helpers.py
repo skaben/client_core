@@ -67,7 +67,6 @@ def make_event(_type, cmd, data=None):
     # todo: err handling
     try:
         event = Event(_type, cmd, data)
-        print(event)
         return event
     except Exception:
         raise

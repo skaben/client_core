@@ -1,7 +1,7 @@
 import os
 import yaml
 import pytest
-import sqlite3
+from skabenclient.config import SystemConfig
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -21,9 +21,10 @@ def get_iface():
     return _iface()
 
 
-def write_config(config, path=None):
-    if not path:
-        path = os.path.join(root_dir, "res", "test_config.yml")
+def write_config(config, fname=None):
+    if not fname:
+        fname = "test_config.yml"
+    path = os.path.join(root_dir, "res", fname)
     try:
         with open(path, "w") as file:
             yaml.dump(config, file)
@@ -35,9 +36,10 @@ def write_config(config, path=None):
 @pytest.fixture(scope="module")
 def get_config(request):
 
-    def _wrap(config_obj, config_dict):
-        path = write_config(config_dict)
+    def _wrap(config_obj, config_dict, fname=None):
+        path = write_config(config_dict, fname)
         config = config_obj(path)
+        config.update(config_dict)
 
         def _td():
             try:
@@ -50,5 +52,34 @@ def get_config(request):
 
         request.addfinalizer(_td)
         return config
+
+    return _wrap
+
+#TODO: config collection
+
+
+@pytest.fixture(scope="module")
+def default_config():
+
+    _sys = {
+        "dev_type": "test",
+        "test": "test",
+        "name": "main",
+        "iface": _iface()
+    }
+
+    _dev = {'bool': True,
+            'int': 1,
+            'float': 0.1,
+            'string': 'abcd',
+            'list': [1, 'str', 0.1]}
+
+    switch = {
+        'sys': _sys,
+        'dev': _dev
+    }
+
+    def _wrap(conf_type):
+        return switch.get(conf_type)
 
     return _wrap
