@@ -54,18 +54,16 @@ class Router(Thread):
         self.running = False
 
 
-def start_app(config,
+def start_app(app_config,
               device,
-              event_handler,
               **kwargs):
 
-    config.update({
+    app_config.update({
         'device': device,
-        'event_handler': event_handler
     })
 
-    config.update(kwargs)
-    data = config.data
+    app_config.update(kwargs)
+    data = app_config.data
 
     client = CDLClient(q_ext=data['q_ext'],
                        q_int=data['q_int'],
@@ -73,15 +71,15 @@ def start_app(config,
                        dev_type=data['dev_type'],
                        uid=data['uid'])
 
-    router = Router(config)
+    router = Router(app_config)
 
     try:
         client.start()  # MQTT client
         router.start()  # message routing
-        config['device'].run()  # device interface
+        app_config['device'].run()  # device interface
     except Exception:
         raise
     finally:
         router.join(1)
         client.join(1)
-        print(f'running config:\n {config}')
+        print(f'running application with config:\n {app_config}')
