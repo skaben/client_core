@@ -15,28 +15,28 @@ class BaseManager:
     event = dict()
 
     def __init__(self, config):
-        self.config = config.data
+        self.sys_conf = config.data
         self.logger = config.logger()
-        self.q_int = self.config.get('q_int')
+        self.q_int = self.sys_conf.get('q_int')
         if not self.q_int:
             raise Exception('internal queue not declared')
-        self.q_ext = self.config.get('q_ext')
+        self.q_ext = self.sys_conf.get('q_ext')
         if not self.q_ext:
             raise Exception('external (to mqtt) queue not declared')
         # keepalive TS management
-        self.ts_fname = os.path.join(os.getcwd(), 'ts')
+        self.ts_fname = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ts')
         if not os.path.exists(self.ts_fname):
             with open(self.ts_fname, 'w') as fh:
                 fh.write('0')
         self.ts = self._last_ts()
-        self.dev_type = self.config.get('dev_type')
-        self.uid = self.config.get('uid')
+        self.dev_type = self.sys_conf.get('dev_type')
+        self.uid = self.sys_conf.get('uid')
         self.reply_channel = self.dev_type + 'ask'
 
     def get_ip_addr(self):
         """ Get IP address by interface name """
         try:
-            iface = self.config.get('iface')
+            iface = self.sys_conf.get('iface')
             self.ip = netif.ifaddresses(iface)[netif.AF_INET][0]['addr']
             return self.ip
         except Exception:
@@ -46,12 +46,16 @@ class BaseManager:
         """ Read previous timestamp value from 'ts' file """
         with open(self.ts_fname, 'r') as fh:
             t = fh.read().rstrip()
-            return int(t)
+            if t:
+                return int(t)
+            else:
+                return 0
 
     def rewrite_ts(self, new_ts):
         """ Write timestamp value to file 'ts' """
         with open(self.ts_fname, 'w') as fh:
-            fh.write(str(new_ts))
+            fh.write(str(int(new_ts)))
+            return int(new_ts)
 
     def __enter__(self):
         return self
