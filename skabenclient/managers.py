@@ -157,7 +157,6 @@ class EventManager(BaseManager):
             finally:
                 return self.confirm_update(task_id, response)
         elif event.cmd == 'send':
-            # deprecated
             # send to server without local db update
             logging.debug('event is {} - sending data to server'.format(event))
             return self.send_config(event.data)
@@ -165,7 +164,7 @@ class EventManager(BaseManager):
             # update local db, send to server
             logging.debug('event is {} - input: {}'.format(event, event.data))
             if event.data:
-                self.dev_conf.save(event.data) # already saved
+                self.dev_conf.save(event.data)
                 return self.send_config(event.data)
             else:
                 logging.error('missing data from event: {}'.format(event))
