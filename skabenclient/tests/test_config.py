@@ -110,9 +110,9 @@ def test_config_device_load(get_config, config_dict):
 
 
 @pytest.mark.parametrize('config_dict', _devconfig.values())
-def test_config_device_set_default(get_config, config_dict):
+def test_config_device_reset(get_config, config_dict):
     cfg = get_config(DeviceConfig, config_dict)
-    cfg.set_default()
+    cfg.reset()
     cfg.save()
     new_conf = cfg.load()
 
