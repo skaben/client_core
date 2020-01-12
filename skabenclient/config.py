@@ -54,6 +54,7 @@ class FileLock:
 class Config:
 
     filtered_keys = list()
+    default_config = dict()
     root = os.path.dirname(os.path.realpath(__file__))
 
     def __init__(self, config_path):
@@ -103,6 +104,9 @@ class Config:
     def set(self, key, val):
         """ Set compatibility wrapper """
         return self.update({key: val})
+
+    def reset(self):
+        self.data = self.default_config
 
 
 class SystemConfig(Config):
@@ -178,14 +182,6 @@ class DeviceConfig(Config):
             self.update(payload)
         return self.write()
 
-    def get_running(self):
+    def get_current(self):
         """ Get current config """
-        data = self.get_values(self.data)
-        if not data:
-            return self.set_default()
-        else:
-            return data
-
-    def set_default(self):
-        """ Reset config state to defaults without saving to file """
-        self.data = self.default_config
+        return self.data

@@ -27,26 +27,43 @@ class MockMessage:
 
 @pytest.fixture
 def event_setup(get_config, default_config):
-    devcfg = get_config(DeviceConfig, default_config('dev'), 'test_cfg.yml')
-    devcfg.save()
 
-    dev_dict = {**default_config('sys'), **{'device_file': devcfg.config_path}}
-    syscfg = get_config(SystemConfig, dev_dict, 'system_conf.yml')
+    def _wrap(sys_config=None, dev_config=None):
+        if not sys_config:
+            sys_config = default_config('sys')
+        if not dev_config:
+            dev_config = default_config('dev')
 
-    handler = BaseHandler(syscfg)
+        devcfg = get_config(DeviceConfig, dev_config, 'test_cfg.yml')
+        devcfg.save()
 
-    syscfg.set('device', handler)
+        sys_dict = {**sys_config, **{'device_file': devcfg.config_path}}
+        syscfg = get_config(SystemConfig, sys_dict, 'system_conf.yml')
 
-    return syscfg
+        handler = BaseHandler(syscfg)
+
+        syscfg.set('device', handler)
+
+        return syscfg
+
+    return _wrap
+
+
+def test_event_extended_dict(event_setup, default_config, monkeypatch):
+    dev_dict = {**default_config('dev'), **{'test_key': "test_val"}}
+    syscfg = event_setup(dev_config=dev_dict)
+
+    assert syscfg.get('device').config.data == dev_dict, 'not loaded'
 
 
 def test_event_manager_update(event_setup, monkeypatch):
     """ Test update command """
-    syscfg = event_setup
+    syscfg = event_setup()
     event = make_event('device', 'update', {'value': 'newval',
                                             'task_id': 123123})
     syscfg.get('device').config.set('value', 'oldval')
     syscfg.get('device').config.save()
+
 
     with mgr.EventManager(syscfg) as manager:
         monkeypatch.setattr(manager, 'confirm_update', lambda *args: {'task_id': args[0],
@@ -62,7 +79,7 @@ def test_event_manager_update(event_setup, monkeypatch):
 
 def test_event_manager_send(event_setup, monkeypatch, default_config):
     """ Test send command """
-    syscfg = event_setup
+    syscfg = event_setup()
     _dict = {'new_value': 'new'}
     event = make_event('device', 'send', _dict)
 
@@ -78,7 +95,7 @@ def test_event_manager_send(event_setup, monkeypatch, default_config):
 
 def test_event_manager_input(event_setup, monkeypatch, default_config):
     """ Test input command """
-    syscfg = event_setup
+    syscfg = event_setup()
     _dict = {'new_value': 'new'}
     event = make_event('device', 'input', _dict)
 
@@ -94,7 +111,7 @@ def test_event_manager_input(event_setup, monkeypatch, default_config):
 
 def test_event_manager_reload(event_setup, default_config):
     """ Test reload command """
-    syscfg = event_setup
+    syscfg = event_setup()
     dev_conf = syscfg.get('device').config
 
     pre_conf = dev_conf.load()
@@ -110,7 +127,7 @@ def test_event_manager_reload(event_setup, default_config):
 
 def test_event_manager_send_config(event_setup, monkeypatch, default_config):
     """ Test send config to server """
-    syscfg = event_setup
+    syscfg = event_setup()
     device = syscfg.get('device')
     _dict = {'new_value': 'newvalue'}
 
@@ -132,13 +149,12 @@ def test_event_manager_send_config(event_setup, monkeypatch, default_config):
 
 def test_event_manager_send_config_filtered(event_setup, monkeypatch, default_config):
     """ Test send config to server """
-    syscfg = event_setup
-    device = syscfg.get('device')
-    device.filtered_keys.extend(['filtered'])
+    syscfg = event_setup()
     _dict = {'new_value': 'newvalue', 'filtered': True}
 
     with mgr.EventManager(syscfg) as manager:
         in_queue = list()
+        manager.filtered_keys.extend(['filtered'])
         monkeypatch.setattr(manager.q_ext, 'put', lambda x: in_queue.append(x))
         manager.send_config(_dict)
         message = MockMessage(in_queue[-1])
@@ -148,3 +164,51 @@ def test_event_manager_send_config_filtered(event_setup, monkeypatch, default_co
     assert result['payload'].get('new_value') == 'newvalue', 'data not sent'
     assert result['payload'].get('filtered') is not True, 'filtered data sent'
 
+
+def test_event_manager_config_reply(event_setup, default_config, monkeypatch):
+    syscfg = event_setup()
+    with mgr.EventManager(syscfg) as manager:
+        in_queue = list()
+        monkeypatch.setattr(manager.q_ext, 'put', lambda x: in_queue.append(x))
+        manager.config_reply()
+        message = MockMessage(in_queue[-1])
+        with skpt.PacketDecoder() as decoder:
+            result = decoder.decode(message)
+
+    assert result['payload'].get('request') == 'all'
+
+
+def test_event_manager_config_reply_keys(event_setup, default_config, monkeypatch):
+    dev_dict = {**default_config('dev'), **{'test_key': 'test_value', 'task_id': '12345'}}
+    syscfg = event_setup(dev_config=dev_dict)
+    _keys = ['test_key']
+
+    with mgr.EventManager(syscfg) as manager:
+        in_queue = list()
+        monkeypatch.setattr(manager.q_ext, 'put', lambda x: in_queue.append(x))
+        manager.config_reply(keys=_keys)
+        message = MockMessage(in_queue[-1])
+        with skpt.PacketDecoder() as decoder:
+            result = decoder.decode(message)
+        config_data = manager.dev_conf.get_current()
+
+        assert config_data.get('test_key') == dev_dict.get('test_key')
+        assert result['payload'].get('request') == _keys
+
+
+@pytest.mark.parametrize('cmd', ('ACK', 'NACK',))
+def test_event_manager_confirm_update_ack(event_setup, default_config, monkeypatch, cmd):
+    dev_dict = {**default_config('dev'), **{'test_key': 'test_value', 'task_id': '12345'}}
+    syscfg = event_setup(dev_config=dev_dict)
+    _task_id = '123456'
+
+    with mgr.EventManager(syscfg) as manager:
+        in_queue = list()
+        monkeypatch.setattr(manager.q_ext, 'put', lambda x: in_queue.append(x))
+        manager.confirm_update(packet_type=cmd, task_id=_task_id)
+        message = MockMessage(in_queue[-1])
+        with skpt.PacketDecoder() as decoder:
+            result = decoder.decode(message)
+
+        assert result['command'] == cmd
+        assert result['payload'].get('task_id') == _task_id
