@@ -1,10 +1,10 @@
 import os
+import random
 import logging
 import netifaces as netif
 
 import skabenproto as sk
 from skabenclient.helpers import make_event
-from skabenclient.config import DeviceConfig
 
 
 class BaseManager:
@@ -145,6 +145,7 @@ class EventManager(BaseManager):
 
     def __init__(self, config):
         super().__init__(config)
+        self.task_id = ''.join([str(random.randrange(10)) for _ in range(10)])
         self.dev_conf = config.get('device').config
 
     def manage(self, event):
@@ -190,6 +191,7 @@ class EventManager(BaseManager):
             packet = p.load('SUP',
                             uid=self.uid,
                             dev_type=self.reply_channel,
+                            task_id=self.task_id,
                             payload=data)
             # add IP as additional field
             # packet.payload.update({'ip': self.config['ip']})
@@ -197,9 +199,11 @@ class EventManager(BaseManager):
             self.q_ext.put(encoded)
 
     def config_reply(self, keys=None):
-        current = self.dev_conf.get_running()
+        current = self.dev_conf.get_current()
+        if not current:
+            current = self.dev_conf.load()
         if keys:
-            payload = {'request': tuple(k for k in current if k in keys)}
+            payload = {'request': [k for k in current if k in keys]}
         else:
             payload = {'request': 'all'}  # full conf
 
@@ -207,6 +211,7 @@ class EventManager(BaseManager):
             packet = p.load('CUP',
                             dev_type=self.reply_channel,
                             uid=self.uid,
+                            task_id=self.task_id,
                             payload=payload)
             encoded = p.encode(packet, self.ts)
             self.q_ext.put(encoded)
@@ -215,6 +220,9 @@ class EventManager(BaseManager):
         """ Confirm to server that we received and applied config
             should be initialized only after device handler success
         """
+        if packet_type not in ('ACK', 'NACK'):
+            raise Exception(f'packet type not ACK or NACK: {packet_type}')
+
         with sk.PacketEncoder() as p:
             packet = p.load(packet_type,
                             dev_type=self.reply_channel,
