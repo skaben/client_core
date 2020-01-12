@@ -146,7 +146,10 @@ class EventManager(BaseManager):
     def __init__(self, config):
         super().__init__(config)
         self.task_id = ''.join([str(random.randrange(10)) for _ in range(10)])
-        self.dev_conf = config.get('device').config
+        self.device = config.get('device')
+
+        if not self.device:
+            raise Exception('Manager error: device is not initialized')
 
     def manage(self, event):
         if event.cmd == 'update':
@@ -155,7 +158,7 @@ class EventManager(BaseManager):
             task_id = event.data.get('task_id', '12345')
             response = 'ACK'
             try:
-                self.dev_conf.save(event.data)
+                self.device.config.save(event.data)
             except Exception:
                 response = 'NACK'
                 logging.exception('cannot apply new config')
@@ -169,14 +172,14 @@ class EventManager(BaseManager):
             # update local db, send to server
             logging.debug('event is {} - input: {}'.format(event, event.data))
             if event.data:
-                self.dev_conf.save(event.data)
+                self.device.config.save(event.data)
                 return self.send_config(event.data)
             else:
                 logging.error('missing data from event: {}'.format(event))
         elif event.cmd == 'reload':
             # just reload device with current plot
             logging.debug('event is {} - reloading device'.format(event))
-            return self.dev_conf.load()
+            return self.device.config.load()
         else:
             logging.error('bad event {}'.format(event))
 
@@ -199,9 +202,9 @@ class EventManager(BaseManager):
             self.q_ext.put(encoded)
 
     def config_reply(self, keys=None):
-        current = self.dev_conf.get_current()
+        current = self.device.config.get_current()
         if not current:
-            current = self.dev_conf.load()
+            current = self.device.config.load()
         if keys:
             payload = {'request': [k for k in current if k in keys]}
         else:

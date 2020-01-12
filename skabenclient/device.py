@@ -2,13 +2,11 @@ from skabenclient.config import DeviceConfig
 from skabenclient.helpers import make_event
 
 
-class BaseHandler:
+class BaseDevice:
 
-    """ Abstract device handler class
-
-        Provides:
-        - internal event queue for events from user input
-
+    """ Abstract device handler class.
+        Handling user input and end device state.
+        All persistent storage operations and server interactions is performed by managers
     """
 
     def __init__(self, system_config):
@@ -18,7 +16,7 @@ class BaseHandler:
         self.uid = system_config.get('uid')
         self.logger = system_config.logger()
 
-    def user_input(self, data):
+    def state_update(self, data):
         """ Update device configuration from user actions """
         if not isinstance(data, dict):
             self.logger.error('message type not dict: {}\n{}'.format(type(data), data))
