@@ -4,7 +4,7 @@ import skabenproto as skpt
 import skabenclient.managers as mgr
 
 from skabenclient.config import SystemConfig, DeviceConfig
-from skabenclient.device import BaseHandler
+from skabenclient.device import BaseDevice
 from skabenclient.helpers import make_event
 
 
@@ -40,7 +40,7 @@ def event_setup(get_config, default_config):
         sys_dict = {**sys_config, **{'device_file': devcfg.config_path}}
         syscfg = get_config(SystemConfig, sys_dict, 'system_conf.yml')
 
-        handler = BaseHandler(syscfg)
+        handler = BaseDevice(syscfg)
 
         syscfg.set('device', handler)
 
@@ -64,13 +64,14 @@ def test_event_manager_update(event_setup, monkeypatch):
     syscfg.get('device').config.set('value', 'oldval')
     syscfg.get('device').config.save()
 
-
     with mgr.EventManager(syscfg) as manager:
         monkeypatch.setattr(manager, 'confirm_update', lambda *args: {'task_id': args[0],
                                                                       'response': args[1]})
         result = manager.manage(event)
 
-    test_conf = syscfg.get('device').config.load()
+    devconf = syscfg.get('device').config
+    devconf.reset()  # clean up config namespace
+    test_conf = devconf.load()  # reread from file
 
     assert result.get('response') == 'ACK'
     assert result.get('task_id') == 123123
@@ -190,7 +191,7 @@ def test_event_manager_config_reply_keys(event_setup, default_config, monkeypatc
         message = MockMessage(in_queue[-1])
         with skpt.PacketDecoder() as decoder:
             result = decoder.decode(message)
-        config_data = manager.dev_conf.get_current()
+        config_data = manager.device.config.get_current()
 
         assert config_data.get('test_key') == dev_dict.get('test_key')
         assert result['payload'].get('request') == _keys
