@@ -13,14 +13,15 @@ class Router(Thread):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.q_int = config.q_int
-        self.q_ext = config.q_ext
-        self.logger = config.logger
-        self.handler = config.handler
-        self.running = True
+        self.q_int = config.get("q_int")
+        self.q_ext = config.get("q_ext")
+        self.device = config.get("device")
+        self.logger = config.logger()
+        self.running = False
 
     def run(self):
         self.logger.debug('router module starting...')
+        self.running = True
         while self.running:
             if self.q_int.empty():
                 time.sleep(.1)
@@ -41,7 +42,7 @@ class Router(Thread):
                         self.q_ext.put(('exit', 'message'))
                         self.running = False
                     else:
-                        with self.handler(self.config) as handler:
+                        with self.device(self.config) as handler:
                             handler.manage(msg)
                 else:
                     self.logger.error('cannot determine message type for:\n{}'.format(msg))
@@ -55,11 +56,11 @@ class Router(Thread):
 
 
 def start_app(app_config,
-              device,
+              event_manager,
               **kwargs):
 
     app_config.update({
-        'device': device,
+        'event_manager': event_manager,
     })
 
     app_config.update(kwargs)
