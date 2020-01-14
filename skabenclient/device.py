@@ -1,4 +1,4 @@
-from skabenclient.config import DeviceConfig
+from skabenclient.config import DeviceConfig, SystemConfig
 from skabenclient.helpers import make_event
 
 
@@ -10,6 +10,8 @@ class BaseDevice:
     """
 
     def __init__(self, system_config):
+        if not isinstance(system_config, SystemConfig):
+            raise Exception(f'config object is not a SystemConfig, but {type(system_config)} instead')
         self.config = DeviceConfig(system_config.get('device_file'))
         self.config.load()
         self.q_int = system_config.get('q_int')
