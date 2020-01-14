@@ -3,59 +3,19 @@ import yaml
 import time
 import logging
 import multiprocessing as mp
-from skabenclient.helpers import get_mac, get_ip
+from skabenclient.helpers import get_mac, get_ip, FileLock
 from skabenclient.loaders import get_yaml_loader
 
 ExtendedLoader = get_yaml_loader()
 
-
-class FileLock:
-
-    locked = None
-
-    def __init__(self, file_to_lock, timeout=1):
-        self.timeout = timeout
-        self.lock_path = os.path.abspath(file_to_lock) + '.lock'
-
-    def acquire(self):
-        """ """
-        idx = 0
-        while not self.locked:
-            try:
-                time.sleep(.1)
-                with open(self.lock_path, 'w+') as fl:
-                    content = fl.read().strip()
-                    print(content)
-                    if content != '1':
-                        fl.write('1')
-                        self.locked = True
-                        return self.locked
-                idx += .1
-                if idx >= self.timeout:
-                    raise Exception('failed to acquire file lock by timeout')
-            except Exception:
-                raise
-
-    def release(self):
-        """ Release file lock """
-        with open(self.lock_path, 'w') as fl:
-            fl.write('0')
-        self.locked = None
-
-    def __enter__(self):
-        self.acquire()
-        return self
-
-    def __exit__(self, *err):
-        self.release()
-        return
+# TODO: config path generation, default config writing
 
 
 class Config:
 
     filtered_keys = list()
     default_config = dict()
-    root = os.path.dirname(os.path.realpath(__file__))
+    root = os.getcwd()
 
     def __init__(self, config_path):
         self.data = dict()
@@ -69,19 +29,21 @@ class Config:
                 with open(self.config_path, 'r') as fh:
                     return yaml.load(fh, Loader=ExtendedLoader)
         except FileNotFoundError:
-            raise
+            self.write(self.default_config, 'w+')
+            return self.default_config
         except yaml.YAMLError:
             raise
         except Exception:
             raise
 
-    def write(self):
+    def write(self, data=None, mode='w'):
         """ Writes to config file """
-        config = self.get_values(self.data)
+        if not data:
+            data = self.data
         try:
             with FileLock(self.config_path):
-                with open(self.config_path, 'w') as fh:
-                    fh.write(yaml.dump(config))
+                with open(self.config_path, mode) as fh:
+                    fh.write(yaml.dump(self.get_values(data)))
         except Exception:
             raise
 
@@ -128,6 +90,7 @@ class SystemConfig(Config):
             'ip': get_ip(iface),
             'q_int': mp.Queue(),
             'q_ext': mp.Queue(),
+            'device_conf': os.path.join(self.root, "conf", "device.yml")
         })
 
     def logger(self, file_path=None, log_level=None):
@@ -169,18 +132,24 @@ class DeviceConfig(Config):
     def __init__(self, config_path=None):
         self.data = dict()
         if not config_path:
-            config_path = os.path.join(self.root, 'conf', 'running.yml')
+            config_path = os.path.join(self.root, 'conf', 'device.yml')
         super().__init__(config_path)
 
     def load(self):
         """ Load and apply state from file """
-        return self.update(self.read())
+        if not self.read():
+            # set config to default values
+            self.data = self.default_config
+            self.write()
+            return self.data
+        else:
+            return self.update(self.read())
 
     def save(self, payload=None):
         """ Apply and save persistent state """
         if payload:
             self.update(payload)
-        return self.write()
+        return self.write(self.data)
 
     def get_current(self):
         """ Get current config """
