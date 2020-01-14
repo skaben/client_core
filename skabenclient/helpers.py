@@ -1,5 +1,6 @@
 import os
 import yaml
+import time
 import logging
 import subprocess
 import socket
@@ -70,3 +71,45 @@ def make_event(_type, cmd, data=None):
         return event
     except Exception:
         raise
+
+
+class FileLock:
+
+    locked = None
+
+    def __init__(self, file_to_lock, timeout=1):
+        self.timeout = timeout
+        self.lock_path = os.path.abspath(file_to_lock) + '.lock'
+
+    def acquire(self):
+        """ """
+        idx = 0
+        while not self.locked:
+            try:
+                time.sleep(.1)
+                with open(self.lock_path, 'w+') as fl:
+                    content = fl.read().strip()
+                    print(content)
+                    if content != '1':
+                        fl.write('1')
+                        self.locked = True
+                        return self.locked
+                idx += .1
+                if idx >= self.timeout:
+                    raise Exception('failed to acquire file lock by timeout')
+            except Exception:
+                raise
+
+    def release(self):
+        """ Release file lock """
+        with open(self.lock_path, 'w') as fl:
+            fl.write('0')
+        self.locked = None
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *err):
+        self.release()
+        return
