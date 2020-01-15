@@ -80,7 +80,7 @@ class SoundLoader:
         except Exception:
             raise
 
-    def _snd(fname, volume=None):
+    def _snd(self, fname, volume=None):
         if not volume:
             volume = 1
 
@@ -90,6 +90,8 @@ class SoundLoader:
             return snd
         except FileNotFoundError:
             raise FileNotFoundError(f'failed to load sound: {fname}')
+        except Exception:
+            raise Exception
 
 
 class ImageLoader:
