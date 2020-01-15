@@ -7,37 +7,38 @@ from skabenclient.helpers import make_event
 import skabenproto as sk
 
 
-class CDLClient(Process):
+class MQTTClient(Process):
 
     ch = dict()
     subscr_stat = ''
 
-    def __init__(self, q_int, q_ext,
-                 broker_ip=None, broker_port=1883,
-                 dev_type=None, uid=None,):
+    def __init__(self, config):
         super().__init__()
 
-        if not broker_ip or not dev_type:
+        self.event = dict()
+        self.daemon = True
+        self.client = None
+
+        # Queues
+        self.q_int = config.get('q_int')
+        self.q_ext = config.get('q_ext')
+
+        # Device
+        self.dev_type = config.get('dev_type')
+        self.uid = config.get('uid')  # uid
+        self.publish = self.dev_type + 'ask'
+        self.skip_until = 0
+
+        # MQTT broker
+        self.broker_ip = config.get('broker_ip')
+        self.broker_port = config.get('broker_port', 1883)
+
+        if not self.broker_ip or not self.dev_type:
             logging.error('[!] cannot configure client, exiting...')
             return
 
-        self.event = dict()
-        self.q_int = q_int
-        self.q_ext = q_ext
-
-        # Device
-        self.dev_type = dev_type
-        self.uid = uid  # uid
-        self.publish = dev_type + 'ask'
-        self.skip_until = 0
-
-        # broker
-        self.broker_ip = broker_ip
-        self.broker_port = broker_port
-
         # set MQTT channels for subscription and publishing
-        self.listen = [dev_type, dev_type + '/' + uid]  # listen all
-        self.running = True
+        self.listen = [self.dev_type, f"{self.dev_type}/{self.uid}"]  # listen all
 
     def run(self):
         # MQTT client
@@ -50,6 +51,7 @@ class CDLClient(Process):
         logging.debug(':: connecting to MQTT broker at {}:{}...'
                       .format(self.broker_ip, self.broker_port))
         tries = 0
+        self.running = True
 
         while not self.client.is_connected:
             if self.running is False:
