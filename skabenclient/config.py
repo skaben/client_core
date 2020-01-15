@@ -20,6 +20,8 @@ class Config:
     def __init__(self, config_path):
         self.data = dict()
         self.config_path = config_path
+        if not config_path:
+            raise Exception(f'config path is missing for {self}')
         self.update(self.read())
 
     def read(self):
@@ -84,8 +86,6 @@ class SystemConfig(Config):
 
     def __init__(self, config_path=None):
         self.data = dict()
-        if not config_path:
-            config_path = os.path.join(self.root, 'conf', 'config.yml')
         super().__init__(config_path)
         iface = self.data.get('iface')
 
@@ -140,10 +140,8 @@ class DeviceConfig(Config):
 
     filtered_keys = ['message']  # this keys will not be stored in config file
 
-    def __init__(self, config_path=None):
+    def __init__(self, config_path):
         self.data = dict()
-        if not config_path:
-            config_path = os.path.join(self.root, 'conf', 'device.yml')
         super().__init__(config_path)
 
     def load(self):
