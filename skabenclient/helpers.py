@@ -50,24 +50,39 @@ def get_config(fname):
 
 class Event:
 
+    """ Simple internal event """
+
     def __init__(self, _type, cmd, data=None):
         self.type = _type
         self.cmd = cmd
-        if data:
-            self.data = data
-
-            if self.type == 'mqtt':
-                self.payload = self.data.get('payload')
-                self.server_cmd = self.data.get('command')
+        self.data = data if data else None
 
     def __repr__(self):
         return '[ EVENT: {} >> {} ]'.format(self.type, self.cmd)
 
 
+class MQTTEvent(Event):
+
+    """ External (MQTT) event """
+
+    def __init__(self, _type, cmd, data):
+        if not data:
+            logging.error(f'{self} no data in mqtt event')
+        super().__init__(_type, cmd, data)
+        payload = self.data.get('payload')
+        if not isinstance(payload, dict):
+            logging.error(f'get payload {type(payload)} instead of dict:\n{payload}')
+        self.payload = self.data.get('payload')
+        self.server_cmd = self.data.get('command')
+
+
 def make_event(_type, cmd, data=None):
     # todo: err handling
     try:
-        event = Event(_type, cmd, data)
+        if _type == 'mqtt':
+            event = MQTTEvent(_type, cmd, data)
+        else:
+            event = Event(_type, cmd, data)
         return event
     except Exception:
         raise
