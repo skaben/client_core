@@ -65,6 +65,7 @@ def default_config():
         "dev_type": "test",
         "test": "test",
         "name": "main",
+        "broker_ip": "127.0.0.1",
         "iface": _iface()
     }
 
