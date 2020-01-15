@@ -1,25 +1,33 @@
 import time
 from threading import Thread
-from skabenclient.mqtt_client import CDLClient
-from skabenclient.managers import MQTTManager
+from skabenclient.mqtt_client import MQTTClient
+from skabenclient.contexts import MQTTContext, EventContext
 
 
-class Router(Thread):
+class EventRouter(Thread):
 
     """
         mr Slim Controller wannabe
+
+        routing internal queue events
+
+        external queue used only for sending messages to server via MQTT
+        new mqtt messages from server comes to internal queue from MQTTClient
+        queues separated because of server messages top priority
     """
 
     def __init__(self, config):
         super().__init__()
-        self.config = config
+        self.daemon = True
+        self.running = False
         self.q_int = config.get("q_int")
         self.q_ext = config.get("q_ext")
-        self.device = config.get("device")
+        self.device = config.get('device')
         self.logger = config.logger()
-        self.running = False
+        self.config = config  # for passing to contexts
 
     def run(self):
+        """ Routing events from internal queue """
         self.logger.debug('router module starting...')
         self.running = True
         while self.running:
@@ -27,60 +35,45 @@ class Router(Thread):
                 time.sleep(.1)
                 continue
             try:
-                # TODO: more clear queue system
-                msg = self.q_int.get()
-                # get packets with label 'mqtt' (from server)
-                if msg.type == 'mqtt':
-                    # PacketManager will manage events and send replies
-                    # 1. directly (in case of ping/pong or wait)
-                    # 2. with re-entry to q_int queue with label 'device'
-                    with MQTTManager(self.config) as mqtt_manager:
-                        mqtt_manager.manage(msg)  # managing event
-                elif msg.type == 'device':
-                    if msg.cmd == 'exit':
+                event = self.q_int.get()
+                if event.type == 'mqtt':
+                    # get packets with label 'mqtt' (from server)
+                    with MQTTContext(self.config) as mqtt:
+                        mqtt.manage(event)
+                elif event.type == 'device':
+                    if event.cmd == 'exit':
                         # catch exit from end device, stopping app
                         self.q_ext.put(('exit', 'message'))
-                        self.running = False
+                        self.stop()
                     else:
-                        with self.device(self.config) as handler:
-                            handler.manage(msg)
+                        # passing to event manager
+                        with EventContext(self.config) as context:
+                            context.manage(event)
                 else:
-                    self.logger.error('cannot determine message type for:\n{}'.format(msg))
+                    self.logger.error('cannot determine message type for:\n{}'.format(event))
             except Exception:
                 self.logger.exception('exception in manager context:')
-                self.running = False
-        self.logger.debug('router module stopping...')
+                self.stop()
 
     def stop(self):
+        """ Full stop """
+        self.logger.debug('router module stopping...')
         self.running = False
 
 
-def start_app(app_config,
-              event_manager,
-              **kwargs):
+def start_app(app_config, device):
 
-    app_config.update({
-        'event_manager': event_manager,
-    })
-
-    app_config.update(kwargs)
-    data = app_config.data
-
-    client = CDLClient(q_ext=data['q_ext'],
-                       q_int=data['q_int'],
-                       broker_ip=data['broker_ip'],
-                       dev_type=data['dev_type'],
-                       uid=data['uid'])
-
-    router = Router(app_config)
+    app_config.update({'device': device})  # assign end device for user interactions
+    mqttc = MQTTClient(app_config)  # initialize MQTT client for talking with server
+    router = EventRouter(app_config)  # initialize router for internal events
 
     try:
-        client.start()  # MQTT client
-        router.start()  # message routing
-        app_config['device'].run()  # device interface
+        mqttc.start()
+        router.start()
+        app_config.get('device').run()
     except Exception:
         raise
     finally:
-        router.join(1)
-        client.join(1)
+        router.join(.5)
+        mqttc.join(.5)
         print(f'running application with config:\n {app_config}')
