@@ -1,10 +1,14 @@
 import time
-import threading
 import pytest
+import threading
+from queue import Queue
 
-from skabenclient.main import Router, start_app
+from skabenclient.main import EventRouter, start_app
+from skabenclient.helpers import make_event
+from skabenclient.mqtt_client import MQTTClient
 from skabenclient.device import BaseDevice
 from skabenclient.config import SystemConfig, DeviceConfig
+from skabenclient.contexts import MQTTContext, EventContext
 
 # TODO: git gud at threads testing
 
@@ -21,8 +25,24 @@ def get_router(get_config, default_config):
     device = BaseDevice(syscfg)
     # assign device instance to config singleton
     syscfg.set('device', device)
-    router = Router(syscfg)
+    router = EventRouter(syscfg)
+
     return router, syscfg, devcfg
+
+
+@pytest.fixture
+def get_from_queue():
+
+    def _wrap(queue):
+        idx = 0
+        while not idx >= 10:
+            if not queue.empty():
+                yield queue.get()
+            else:
+                idx += 1
+                time.sleep(.1)
+
+    return _wrap
 
 
 def test_router_init(get_router):
@@ -34,51 +54,99 @@ def test_router_init(get_router):
     assert router.logger, "logger was not created"
 
 
-def test_router_start(get_router, monkeypatch, request, caplog):
+def test_router_start_stop(get_router, monkeypatch, caplog):
     router, syscfg, devcfg = get_router
     monkeypatch.setattr(time, 'sleep', lambda x: True)
+
     router.start()
-
-    def _fin():
-        router.running = False
-        router.join(.1)
-
-    request.addfinalizer(_fin)
-
     assert threading.active_count() == 2, 'bad number of threads'
-
-
-def test_router_run(get_router, request):
-    router, syscfg, devcfg = get_router
-    router.run()
-    assert router.running is True
-    router.running = False
-
-    def _fin():
-        router.running = False
-        router.join(.1)
-
-    request.addfinalizer(_fin)
-
-
-@pytest.mark.skip(reason="bad thread management")
-def test_router_stop(get_router, monkeypatch, request):
-    """ Test router stop method """
-    router, syscfg, devcfg = get_router
-
-    def mock_run():
-        while router.running:
-            time.sleep(.1)
-
-    def _fin():
-        router.running = False
-        router.join(.1)
-
-    request.addfinalizer(_fin)
-
-    monkeypatch.setattr(router, 'run', mock_run)
-    router.start()
-    assert router.running is True, 'router not running'
-
     router.stop()
-    assert router.running is False, 'router still running'
+    assert router.running is False, 'router not stopped'
+    router.join(.1)
+    assert threading.active_count() == 1, 'seems like thread was not exited'
+
+
+def test_router_exit_by_event(get_router, request, get_from_queue):
+    router, syscfg, devcfg = get_router
+    router.start()
+
+    def _fin():
+        router.running = False
+        router.join(.1)
+
+    request.addfinalizer(_fin)
+
+    event = make_event('device', 'exit')
+    syscfg.data['q_int'].put(event)
+    expected_event = list(get_from_queue(syscfg.get('q_ext')))
+
+    assert expected_event, 'cannot get event from external queue'
+    assert not len(expected_event) > 1, 'too many events'
+    assert expected_event[0] == ('exit', 'message'), 'external message not sent'
+    assert router.running is False, 'router was not stopped'
+
+
+def test_router_event_mqtt(get_router, monkeypatch, get_from_queue):
+    router, syscfg, devcfg = get_router
+    test_queue = Queue()
+    monkeypatch.setattr(MQTTContext, 'manage', lambda x, y: test_queue.put(y))
+    router.start()
+
+    kinda_mqtt_parsed_message = {'payload': {'data': 'test'}, 'command': 'PING'}
+    event = make_event('mqtt', 'test', kinda_mqtt_parsed_message)
+    syscfg.get('q_int').put(event)
+    result = list(get_from_queue(test_queue))
+
+    assert result, 'event not managed'
+    assert not len(result) > 1, 'too many events'
+    assert result[0].server_cmd == 'PING'
+    assert result[0].payload == {'data': 'test'}
+
+
+@pytest.mark.parametrize('event_data', ({'dict': 'data'}, None))
+def test_router_event_device(get_router, monkeypatch, get_from_queue, event_data):
+    router, syscfg, devcfg = get_router
+    test_queue = Queue()
+    monkeypatch.setattr(EventContext, 'manage', lambda x, y: test_queue.put(y))
+    router.start()
+
+    event = make_event('device', 'test', event_data)
+    syscfg.get('q_int').put(event)
+    result = list(get_from_queue(test_queue))
+
+    assert result, 'event not managed'
+    assert not len(result) > 1, 'too many events'
+    assert result[0].type == 'device'
+    assert result[0].cmd == 'test'
+    assert result[0].data == event_data
+
+
+def test_start_app_routine(get_config, default_config, get_from_queue, monkeypatch):
+    """ Test all client components was initialized and can be start successfully """
+    # write device config
+    devcfg = get_config(DeviceConfig, default_config('dev'), 'test_cfg.yml')
+    devcfg.save()
+    # write system config with device config file location
+    _cfg = {**default_config('sys'),
+            **{'device_file': devcfg.config_path}}
+    syscfg = get_config(SystemConfig, _cfg)
+    # create device from system config
+    device = BaseDevice(syscfg)
+
+    test_queue = Queue()
+
+    # Mqtt client is a process, monkeypatching "run" method not working because of it
+    monkeypatch.setattr(MQTTClient, 'start', lambda *a: test_queue.put('mqtt'))
+    monkeypatch.setattr(EventRouter, 'run', lambda *a: test_queue.put('router'))
+    # BaseDevice is not a threading interface at all, so no join later
+    monkeypatch.setattr(BaseDevice, 'run', lambda *a: test_queue.put('device'))
+
+    monkeypatch.setattr(MQTTClient, 'join', lambda *a: True)
+    monkeypatch.setattr(EventRouter, 'join', lambda *a: True)
+
+    start_app(app_config=syscfg, device=device)
+
+    result = list(get_from_queue(test_queue))
+    for service in ['mqtt', 'router', 'device']:
+        assert service in result, f'{service} not started'
+
