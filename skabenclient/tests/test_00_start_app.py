@@ -10,7 +10,6 @@ from skabenclient.device import BaseDevice
 from skabenclient.config import SystemConfig, DeviceConfig
 from skabenclient.contexts import MQTTContext, EventContext
 
-# TODO: git gud at threads testing
 
 @pytest.fixture
 def get_router(get_config, default_config):
@@ -19,7 +18,7 @@ def get_router(get_config, default_config):
     devcfg.save()
     # write system config with device config file location
     _cfg = {**default_config('sys'),
-            **{'device_file': devcfg.config_path}}
+            **{'device_conf': devcfg.config_path}}
     syscfg = get_config(SystemConfig, _cfg)
     # create device from system config
     device = BaseDevice(syscfg)
@@ -128,7 +127,7 @@ def test_start_app_routine(get_config, default_config, get_from_queue, monkeypat
     devcfg.save()
     # write system config with device config file location
     _cfg = {**default_config('sys'),
-            **{'device_file': devcfg.config_path}}
+            **{'device_conf': devcfg.config_path}}
     syscfg = get_config(SystemConfig, _cfg)
     # create device from system config
     device = BaseDevice(syscfg)

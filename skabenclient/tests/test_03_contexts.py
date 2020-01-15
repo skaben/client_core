@@ -36,7 +36,7 @@ def event_setup(get_config, default_config):
         devcfg = get_config(DeviceConfig, dev_config, 'test_cfg.yml')
         devcfg.save()
 
-        sys_dict = {**sys_config, **{'device_file': devcfg.config_path}}
+        sys_dict = {**sys_config, **{'device_conf': devcfg.config_path}}
         syscfg = get_config(SystemConfig, sys_dict, 'system_conf.yml')
 
         handler = BaseDevice(syscfg)
