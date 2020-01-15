@@ -30,7 +30,7 @@ def create_test_sounds():
     }
 
 
-def test_sound_loader(create_test_sounds, monkeypatch):
+def test_sound_loader_file(create_test_sounds, monkeypatch):
     snd = create_test_sounds
     channel_list = ['bg', 'fg', 'fx']
     monkeypatch.setattr(pg.mixer, "init", mock_mixer.init)
