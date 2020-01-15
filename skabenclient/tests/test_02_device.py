@@ -9,7 +9,7 @@ from skabenclient.config import SystemConfig, DeviceConfig
 def test_handler_init(get_config, default_config):
     devcfg = get_config(DeviceConfig, {'device': 'test'}, 'test_cfg.yml')
     devcfg.save()
-    dev_dict = {'device_file': devcfg.config_path}
+    dev_dict = {'device_conf': devcfg.config_path}
 
     appcfg = get_config(SystemConfig,
                         {**default_config('sys'), **dev_dict},
@@ -27,7 +27,7 @@ def test_handler_input_new(get_config, default_config, monkeypatch):
     devcfg.save()
 
     _cfg = {**default_config('sys'),
-            **{'device_file': devcfg.config_path}}
+            **{'device_conf': devcfg.config_path}}
     syscfg = get_config(SystemConfig, _cfg)
     handler = BaseDevice(syscfg)
     monkeypatch.setattr(handler, 'logger', MockLogger)
@@ -49,7 +49,7 @@ def test_handler_input_exist(get_config, default_config, monkeypatch):
     devcfg.save()
 
     _cfg = {**default_config('sys'),
-            **{'device_file': devcfg.config_path}}
+            **{'device_conf': devcfg.config_path}}
     syscfg = get_config(SystemConfig, _cfg)
     handler = BaseDevice(syscfg)
     monkeypatch.setattr(handler, 'logger', MockLogger)
@@ -66,7 +66,7 @@ def test_handler_input_send_msg(get_config, default_config, monkeypatch):
     devcfg.save()
 
     _cfg = {**default_config('sys'),
-            **{'device_file': devcfg.config_path}}
+            **{'device_conf': devcfg.config_path}}
     syscfg = get_config(SystemConfig, _cfg)
     handler = BaseDevice(syscfg)
     monkeypatch.setattr(handler, 'logger', MockLogger)
