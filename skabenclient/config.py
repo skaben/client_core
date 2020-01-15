@@ -1,12 +1,12 @@
 import os
 import yaml
-import time
 import logging
 import multiprocessing as mp
 from skabenclient.helpers import get_mac, get_ip, FileLock
 from skabenclient.loaders import get_yaml_loader
 
 ExtendedLoader = get_yaml_loader()
+loggers = {}
 
 # TODO: config path generation, default config writing
 
@@ -68,7 +68,14 @@ class Config:
         return self.update({key: val})
 
     def reset(self):
+        """ Reset to default conf """
         self.data = self.default_config
+
+#    @property
+#    def read_only(self):
+#        """ Config data read-only """
+#        # TODO: make data frozen
+#        pass
 
 
 class SystemConfig(Config):
@@ -101,18 +108,22 @@ class SystemConfig(Config):
             log_level = logging.DEBUG
         file_path = os.path.join(self.root, file_path)
 
-        logger = logging.getLogger('main')
-        FORMAT = '%(asctime)s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s'
-        log_format = logging.Formatter(FORMAT)
-        # set handlers
-        fh = logging.FileHandler(filename=file_path)
-        stream = logging.StreamHandler()
-        # assign
-        for handler in (fh, stream):
-            handler.setFormatter(log_format)
-            handler.setLevel(log_level)
-            logger.addHandler(handler)
-        logger.setLevel(log_level)
+        if loggers.get('main'):
+            logger = loggers.get('main')
+        else:
+            logger = logging.getLogger('main')
+            FORMAT = '%(asctime)s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s'
+            log_format = logging.Formatter(FORMAT)
+            # set handlers
+            fh = logging.FileHandler(filename=file_path)
+            stream = logging.StreamHandler()
+            # assign
+            for handler in (fh, stream):
+                handler.setFormatter(log_format)
+                handler.setLevel(log_level)
+                logger.addHandler(handler)
+            logger.setLevel(log_level)
+            loggers.update({'main': logger})
         return logger
 
 
