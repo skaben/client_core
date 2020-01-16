@@ -147,9 +147,8 @@ class EventContext(BaseContext):
         super().__init__(config)
         self.task_id = ''.join([str(random.randrange(10)) for _ in range(10)])
         self.device = config.get('device')
-
         if not self.device:
-            raise Exception('Manager error: device is not initialized')
+            raise Exception(f'{self} error: device not provided')
 
     def manage(self, event):
         if event.cmd == 'update':
