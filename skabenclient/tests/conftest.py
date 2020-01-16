@@ -36,9 +36,13 @@ def write_config(config, fname=None):
 @pytest.fixture(scope="module")
 def get_config(request):
 
-    def _wrap(config_obj, config_dict, fname=None):
-        path = write_config(config_dict, fname)
-        config = config_obj(path)
+    def _wrap(config_obj, config_dict, **kwargs):
+        path = write_config(config_dict, kwargs.get('fname'))
+        root = kwargs.get('root')
+        if root:
+            config = config_obj(path, root=root)
+        else:
+            config = config_obj(path)
         config.update(config_dict)
 
         def _td():

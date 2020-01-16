@@ -15,7 +15,6 @@ class Config:
 
     filtered_keys = list()
     default_config = dict()
-    root = os.getcwd()
 
     def __init__(self, config_path):
         self.data = dict()
@@ -84,8 +83,9 @@ class SystemConfig(Config):
 
     """ Basic app configuration """
 
-    def __init__(self, config_path=None):
+    def __init__(self, config_path=None, root=None):
         self.data = dict()
+        self.root = root if root else os.path.abspath(os.path.dirname(__file__))
         super().__init__(config_path)
         iface = self.data.get('iface')
 

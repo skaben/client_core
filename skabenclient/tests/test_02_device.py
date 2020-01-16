@@ -7,13 +7,13 @@ from skabenclient.config import SystemConfig, DeviceConfig
 
 
 def test_handler_init(get_config, default_config):
-    devcfg = get_config(DeviceConfig, {'device': 'test'}, 'test_cfg.yml')
+    devcfg = get_config(DeviceConfig, {'device': 'test'}, fname='test_cfg.yml')
     devcfg.save()
     dev_dict = {'device_conf': devcfg.config_path}
 
     appcfg = get_config(SystemConfig,
                         {**default_config('sys'), **dev_dict},
-                        'system_conf.yml')
+                        fname='system_conf.yml')
     handler = BaseDevice(appcfg)
 
     assert devcfg.config_path != appcfg.config_path
@@ -23,7 +23,7 @@ def test_handler_init(get_config, default_config):
 
 
 def test_handler_input_new(get_config, default_config, monkeypatch):
-    devcfg = get_config(DeviceConfig, default_config('dev'), 'test_cfg.yml')
+    devcfg = get_config(DeviceConfig, default_config('dev'), fname='test_cfg.yml')
     devcfg.save()
 
     _cfg = {**default_config('sys'),
@@ -45,7 +45,7 @@ def test_handler_input_new(get_config, default_config, monkeypatch):
 
 
 def test_handler_input_exist(get_config, default_config, monkeypatch):
-    devcfg = get_config(DeviceConfig, default_config('dev'), 'test_cfg.yml')
+    devcfg = get_config(DeviceConfig, default_config('dev'), fname='test_cfg.yml')
     devcfg.save()
 
     _cfg = {**default_config('sys'),
@@ -62,7 +62,7 @@ def test_handler_input_exist(get_config, default_config, monkeypatch):
 
 
 def test_handler_input_send_msg(get_config, default_config, monkeypatch):
-    devcfg = get_config(DeviceConfig, default_config('dev'), 'test_cfg.yml')
+    devcfg = get_config(DeviceConfig, default_config('dev'), fname='test_cfg.yml')
     devcfg.save()
 
     _cfg = {**default_config('sys'),

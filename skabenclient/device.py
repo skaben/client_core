@@ -19,7 +19,7 @@ class BaseDevice:
         self.logger = system_config.logger()
 
     def run(self):
-        raise NotImplemented(f"{self} is abstract and cannot be started")
+        raise NotImplementedError(f"{self} is abstract and cannot be started")
 
     def state_update(self, data):
         """ Update device configuration from user actions """

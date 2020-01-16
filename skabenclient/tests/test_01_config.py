@@ -104,7 +104,7 @@ def test_config_create_file_with_default_dict(get_root, monkeypatch, request):
     assert cfg.data == default_conf, "default config not loaded from file"
 
 
-def test_config_system_init(get_config, default_config):
+def test_config_system_init_base(get_config, default_config):
     """ Test creates SystemConfig """
     config = default_config('sys')
     cfg = get_config(SystemConfig, config)
@@ -113,7 +113,21 @@ def test_config_system_init(get_config, default_config):
     test_keys.sort()
     conf_keys.sort()
 
+    real_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
     assert test_keys == conf_keys, 'bad config data'
+    assert cfg.root == real_root, 'bad config root'
+    assert cfg.get('device_conf') == os.path.join(real_root, 'conf', 'device.yml')
+
+
+def test_config_system_init_with_root(get_config, default_config):
+    """ Test creates SystemConfig """
+    config = default_config('sys')
+    custom_root = '/test/root'
+    cfg = get_config(SystemConfig, config, root=custom_root)
+
+    assert cfg.root == custom_root, 'bad config root'
+    assert cfg.get('device_conf') == os.path.join(custom_root, 'conf', 'device.yml')
 
 
 def test_config_system_logger(get_config, default_config):
