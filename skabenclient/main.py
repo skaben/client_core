@@ -1,4 +1,6 @@
 import time
+import logging
+
 from threading import Thread
 from skabenclient.mqtt_client import MQTTClient
 from skabenclient.contexts import MQTTContext, EventContext
