@@ -18,15 +18,15 @@ class EventRouter(Thread):
         queues separated because of server messages top priority
     """
 
-    def __init__(self, config):
+    def __init__(self, config, event_context):
         super().__init__()
         self.daemon = True
         self.running = False
         self.q_int = config.get("q_int")
         self.q_ext = config.get("q_ext")
-        self.device = config.get('device')
         self.logger = config.logger()
         self.config = config  # for passing to contexts
+        self.event_context = event_context
 
     def run(self):
         """ Routing events from internal queue """
@@ -48,8 +48,8 @@ class EventRouter(Thread):
                         self.q_ext.put(('exit', 'message'))
                         self.stop()
                     else:
-                        # passing to event manager
-                        with EventContext(self.config) as context:
+                        # passing to event context manager
+                        with self.event_context(self.config) as context:
                             context.manage(event)
                 else:
                     self.logger.error('cannot determine message type for:\n{}'.format(event))
@@ -63,11 +63,18 @@ class EventRouter(Thread):
         self.running = False
 
 
-def start_app(app_config, device):
+def start_app(app_config, device, event_context):
+    """ Start application
 
-    app_config.update({'device': device})  # assign end device for user interactions
+        app_config: system app config object
+        device: end device for user interactions
+        event_context: device events controller
+
+    """
+
+    app_config.update({'device': device})  # update config for easy access to device instance
+    router = EventRouter(app_config, event_context)  # initialize router for internal events
     mqttc = MQTTClient(app_config)  # initialize MQTT client for talking with server
-    router = EventRouter(app_config)  # initialize router for internal events
 
     try:
         mqttc.start()
