@@ -14,7 +14,7 @@ from skabenclient.contexts import MQTTContext, EventContext
 @pytest.fixture
 def get_router(get_config, default_config):
     # write device config
-    devcfg = get_config(DeviceConfig, default_config('dev'), 'test_cfg.yml')
+    devcfg = get_config(DeviceConfig, default_config('dev'), fname='test_cfg.yml')
     devcfg.save()
     # write system config with device config file location
     _cfg = {**default_config('sys'),
@@ -123,7 +123,7 @@ def test_router_event_device(get_router, monkeypatch, get_from_queue, event_data
 def test_start_app_routine(get_config, default_config, get_from_queue, monkeypatch):
     """ Test all client components was initialized and can be start successfully """
     # write device config
-    devcfg = get_config(DeviceConfig, default_config('dev'), 'test_cfg.yml')
+    devcfg = get_config(DeviceConfig, default_config('dev'), fname='test_cfg.yml')
     devcfg.save()
     # write system config with device config file location
     _cfg = {**default_config('sys'),
