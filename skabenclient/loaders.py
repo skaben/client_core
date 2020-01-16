@@ -1,6 +1,7 @@
 import os
 import time
 import yaml
+import logging
 import pygame as pg
 import pygame.mixer as mixer
 
@@ -50,11 +51,14 @@ class SoundLoader:
         if not self.enabled:
             # stays silent
             return
+        sound_file = self.sound.get(sound)
+        if not sound_file:
+            logging.error(f'{sound_file} not found in {self.sound}')
         try:
-            self.channels.get(channel).play(self.sound.get(sound), **kwargs)
             delay = kwargs.get('delay')
             if delay:
                 time.sleep(delay)
+            self.channels.get(channel).play(self.sound.get(sound))
         except Exception:
             raise
 
