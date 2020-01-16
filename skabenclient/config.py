@@ -106,11 +106,13 @@ class SystemConfig(Config):
             file_path = 'local.log'
         if not log_level:
             log_level = logging.DEBUG
+
         file_path = os.path.join(self.root, file_path)
 
         if loggers.get('main'):
             logger = loggers.get('main')
         else:
+            logging.basicConfig(filename=file_path, level=log_level)
             logger = logging.getLogger('main')
             FORMAT = '%(asctime)s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s'
             log_format = logging.Formatter(FORMAT)
