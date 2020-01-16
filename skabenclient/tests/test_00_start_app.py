@@ -24,7 +24,7 @@ def get_router(get_config, default_config):
     device = BaseDevice(syscfg)
     # assign device instance to config singleton
     syscfg.set('device', device)
-    router = EventRouter(syscfg)
+    router = EventRouter(syscfg, EventContext)
 
     return router, syscfg, devcfg
 
@@ -46,11 +46,42 @@ def get_from_queue():
 
 def test_router_init(get_router):
     router, syscfg, devcfg = get_router
-    for attr in ('q_int', 'q_ext', 'device'):
+    for attr in ('q_int', 'q_ext', 'event_context'):
         assert hasattr(router, attr), f'missing attribute: {attr}'
+    for attr in ('q_int', 'q_ext'):
         assert getattr(router, attr) == syscfg.data[attr], f"wrong value for {attr}"
 
     assert router.logger, "logger was not created"
+
+
+def test_start_app_routine(get_config, default_config, get_from_queue, monkeypatch):
+    """ Test all client components was initialized and can be start successfully """
+    # write device config
+    devcfg = get_config(DeviceConfig, default_config('dev'), fname='test_cfg.yml')
+    devcfg.save()
+    # write system config with device config file location
+    _cfg = {**default_config('sys'),
+            **{'device_conf': devcfg.config_path}}
+    syscfg = get_config(SystemConfig, _cfg)
+    # create device from system config
+    device = BaseDevice(syscfg)
+
+    test_queue = Queue()
+
+    # Mqtt client is a process, monkeypatching "run" method not working because of it
+    monkeypatch.setattr(MQTTClient, 'start', lambda *a: test_queue.put('mqtt'))
+    monkeypatch.setattr(EventRouter, 'run', lambda *a: test_queue.put('router'))
+    # BaseDevice is not a threading interface at all, so no join later
+    monkeypatch.setattr(BaseDevice, 'run', lambda *a: test_queue.put('device'))
+
+    monkeypatch.setattr(MQTTClient, 'join', lambda *a: True)
+    monkeypatch.setattr(EventRouter, 'join', lambda *a: True)
+
+    start_app(app_config=syscfg, device=device, event_context=EventContext)
+
+    result = list(get_from_queue(test_queue))
+    for service in ['mqtt', 'router', 'device']:
+        assert service in result, f'{service} not started'
 
 
 def test_router_start_stop(get_router, monkeypatch, caplog):
@@ -118,34 +149,3 @@ def test_router_event_device(get_router, monkeypatch, get_from_queue, event_data
     assert result[0].type == 'device'
     assert result[0].cmd == 'test'
     assert result[0].data == event_data
-
-
-def test_start_app_routine(get_config, default_config, get_from_queue, monkeypatch):
-    """ Test all client components was initialized and can be start successfully """
-    # write device config
-    devcfg = get_config(DeviceConfig, default_config('dev'), fname='test_cfg.yml')
-    devcfg.save()
-    # write system config with device config file location
-    _cfg = {**default_config('sys'),
-            **{'device_conf': devcfg.config_path}}
-    syscfg = get_config(SystemConfig, _cfg)
-    # create device from system config
-    device = BaseDevice(syscfg)
-
-    test_queue = Queue()
-
-    # Mqtt client is a process, monkeypatching "run" method not working because of it
-    monkeypatch.setattr(MQTTClient, 'start', lambda *a: test_queue.put('mqtt'))
-    monkeypatch.setattr(EventRouter, 'run', lambda *a: test_queue.put('router'))
-    # BaseDevice is not a threading interface at all, so no join later
-    monkeypatch.setattr(BaseDevice, 'run', lambda *a: test_queue.put('device'))
-
-    monkeypatch.setattr(MQTTClient, 'join', lambda *a: True)
-    monkeypatch.setattr(EventRouter, 'join', lambda *a: True)
-
-    start_app(app_config=syscfg, device=device)
-
-    result = list(get_from_queue(test_queue))
-    for service in ['mqtt', 'router', 'device']:
-        assert service in result, f'{service} not started'
-
