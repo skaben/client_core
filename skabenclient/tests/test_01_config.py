@@ -2,10 +2,9 @@ import os
 import time
 import yaml
 import pytest
-import multiprocessing as mp
 import logging
 
-from skabenclient.config import Config, SystemConfig, DeviceConfig, FileLock
+from skabenclient.config import Config, SystemConfig, DeviceConfig, FileLock, loggers
 from skabenclient.loaders import get_yaml_loader
 
 _devconfig = {'str': {'device': 'testing',
@@ -108,26 +107,12 @@ def test_config_system_init_base(get_config, default_config):
     """ Test creates SystemConfig """
     config = default_config('sys')
     cfg = get_config(SystemConfig, config)
-    test_keys = ['q_int', 'q_ext', 'ip', 'uid', 'device_conf'] + list(config.keys())
+    test_keys = ['q_int', 'q_ext', 'ip', 'uid'] + list(config.keys())
     conf_keys = list(cfg.data.keys())
     test_keys.sort()
     conf_keys.sort()
 
-    real_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-    assert test_keys == conf_keys, 'bad config data'
-    assert cfg.root == real_root, 'bad config root'
-    assert cfg.get('device_conf') == os.path.join(real_root, 'conf', 'device.yml')
-
-
-def test_config_system_init_with_root(get_config, default_config):
-    """ Test creates SystemConfig """
-    config = default_config('sys')
-    custom_root = '/test/root'
-    cfg = get_config(SystemConfig, config, root=custom_root)
-
-    assert cfg.root == custom_root, 'bad config root'
-    assert cfg.get('device_conf') == os.path.join(custom_root, 'conf', 'device.yml')
+    assert conf_keys == test_keys, 'inconsistent config keys'
 
 
 def test_config_system_logger(get_config, default_config):
@@ -137,6 +122,24 @@ def test_config_system_logger(get_config, default_config):
 
     assert logger.level == logging.DEBUG, "bad logging level"
     assert len(logger.handlers) == 2, "bad number of logger handlers"
+    assert loggers.get('main') is logger
+
+
+@pytest.mark.skip(reason='no custom logging yet')
+def test_config_system_logger_fpath(get_config, default_config):
+    """ Test creates SystemConfig logger """
+    cfg = get_config(SystemConfig, default_config('sys'))
+    real_root = os.path.abspath(os.path.dirname(__file__))
+    file_path = os.path.join(real_root, 'res', 'logtest.log')
+
+    logger = cfg.logger(file_path=file_path,
+                        log_level=logging.ERROR)
+
+    #assert logger.level == logging.ERROR, "bad logging level"
+    for handler in logger.handlers:
+        fname = getattr(handler, 'baseFilename')
+        if fname:
+            assert fname == file_path, 'wrong file path passed to logger handler'
 
 
 @pytest.mark.parametrize('config_dict', _devconfig.values())

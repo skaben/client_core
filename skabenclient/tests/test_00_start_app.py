@@ -10,18 +10,19 @@ from skabenclient.device import BaseDevice
 from skabenclient.config import SystemConfig, DeviceConfig
 from skabenclient.contexts import MQTTContext, EventContext
 
+# TODO: rewrite config system
 
 @pytest.fixture
 def get_router(get_config, default_config):
     # write device config
-    devcfg = get_config(DeviceConfig, default_config('dev'), fname='test_cfg.yml')
+    devcfg = get_config(DeviceConfig,
+                        default_config('dev'),
+                        fname='test_cfg.yml')
     devcfg.save()
     # write system config with device config file location
-    _cfg = {**default_config('sys'),
-            **{'device_conf': devcfg.config_path}}
-    syscfg = get_config(SystemConfig, _cfg)
+    syscfg = get_config(SystemConfig, default_config('sys'), fname='sys_cfg.yml')
     # create device from system config
-    device = BaseDevice(syscfg)
+    device = BaseDevice(syscfg, devcfg.config_path)
     # assign device instance to config singleton
     syscfg.set('device', device)
     router = EventRouter(syscfg, EventContext)
@@ -60,11 +61,9 @@ def test_start_app_routine(get_config, default_config, get_from_queue, monkeypat
     devcfg = get_config(DeviceConfig, default_config('dev'), fname='test_cfg.yml')
     devcfg.save()
     # write system config with device config file location
-    _cfg = {**default_config('sys'),
-            **{'device_conf': devcfg.config_path}}
-    syscfg = get_config(SystemConfig, _cfg)
+    syscfg = get_config(SystemConfig, default_config('sys'))
     # create device from system config
-    device = BaseDevice(syscfg)
+    device = BaseDevice(syscfg, devcfg.config_path)
 
     test_queue = Queue()
 
