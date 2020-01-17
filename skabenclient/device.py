@@ -9,14 +9,16 @@ class BaseDevice:
         All persistent storage operations and server interactions is performed by managers
     """
 
-    def __init__(self, system_config):
+    config_class = DeviceConfig
+
+    def __init__(self, system_config, device_config_path):
         if not isinstance(system_config, SystemConfig):
             raise Exception(f'config object is not a SystemConfig, but {type(system_config)} instead')
-        self.config = DeviceConfig(system_config.get('device_conf'))
-        self.config.load()
         self.q_int = system_config.get('q_int')
         self.uid = system_config.get('uid')
         self.logger = system_config.logger()
+        self.config = self.config_class(device_config_path)
+        self.config.load()
 
     def run(self):
         raise NotImplementedError(f"{self} is abstract and cannot be started")

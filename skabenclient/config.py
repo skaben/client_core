@@ -40,7 +40,7 @@ class Config:
     def write(self, data=None, mode='w'):
         """ Writes to config file """
         if not data:
-            data = self.data
+            data = self.get_values(self.data)
         try:
             with FileLock(self.config_path):
                 with open(self.config_path, mode) as fh:
@@ -72,12 +72,6 @@ class Config:
         """ Reset to default conf """
         self.data = self.default_config
 
-#    @property
-#    def read_only(self):
-#        """ Config data read-only """
-#        # TODO: make data frozen
-#        pass
-
 
 class SystemConfig(Config):
 
@@ -97,8 +91,10 @@ class SystemConfig(Config):
             'ip': get_ip(iface),
             'q_int': mp.Queue(),
             'q_ext': mp.Queue(),
-            'device_conf': os.path.join(self.root, "conf", "device.yml")
         })
+
+    def write(self, data=None, mode=None):
+        raise PermissionError('SystemConfig is read-only by design')
 
     def logger(self, file_path=None, log_level=None):
         """ Make logger """
@@ -106,8 +102,6 @@ class SystemConfig(Config):
             file_path = 'local.log'
         if not log_level:
             log_level = logging.DEBUG
-
-        file_path = os.path.join(self.root, file_path)
 
         if loggers.get('main'):
             logger = loggers.get('main')
@@ -133,17 +127,15 @@ class DeviceConfig(Config):
 
     """
         Local data persistent storage operations
-        ! use only in device handlers !
     """
 
     default_config = {
         'dev_type': 'not_used',
     }
 
-    filtered_keys = ['message']  # this keys will not be stored in config file
-
     def __init__(self, config_path):
         self.data = dict()
+        self.filtered_keys.extend(['message'])
         super().__init__(config_path)
 
     def load(self):

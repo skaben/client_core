@@ -1,7 +1,6 @@
 import os
 import yaml
 import pytest
-from skabenclient.config import SystemConfig
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -21,9 +20,7 @@ def get_iface():
     return _iface()
 
 
-def write_config(config, fname=None):
-    if not fname:
-        fname = "test_config.yml"
+def write_config(config, fname):
     path = os.path.join(root_dir, "res", fname)
     try:
         with open(path, "w") as file:
@@ -37,12 +34,8 @@ def write_config(config, fname=None):
 def get_config(request):
 
     def _wrap(config_obj, config_dict, **kwargs):
-        path = write_config(config_dict, kwargs.get('fname'))
-        root = kwargs.get('root')
-        if root:
-            config = config_obj(path, root=root)
-        else:
-            config = config_obj(path)
+        path = write_config(config_dict, kwargs.get('fname', 'not_named.yml'))
+        config = config_obj(path)
         config.update(config_dict)
 
         def _td():
