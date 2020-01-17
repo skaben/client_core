@@ -1,5 +1,4 @@
 import time
-import logging
 
 from threading import Thread
 from skabenclient.mqtt_client import MQTTClient
@@ -63,7 +62,9 @@ class EventRouter(Thread):
         self.running = False
 
 
-def start_app(app_config, device, event_context):
+def start_app(app_config,
+              device,
+              event_context=EventContext):
     """ Start application
 
         app_config: system app config object
