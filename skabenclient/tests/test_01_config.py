@@ -56,51 +56,29 @@ def test_config_update(get_config):
     assert cfg.data.get('name') == "new_name", "config was not updated"
 
 
-def test_config_create_file_empty(get_root, request):
-    """ Test create new config file with empty content """
-    path = os.path.join(get_root, 'res', 'non_existent.yml')
-    cfg = Config(path)
+@pytest.mark.parametrize('conf_obj', (Config, SystemConfig))
+def test_config_file_empty(get_empty_config, monkeypatch, get_root, conf_obj):
+    """ Test config write default """
+    path = os.path.join(get_root, 'res', 'missing.yml')
 
-    def config_td():
-        try:
-            os.remove(path)
-            os.remove(f"{path}.lock")
-        except FileNotFoundError:
-            pass
-        except Exception:
-            raise
-
-    request.addfinalizer(config_td)
-
-    assert os.path.isfile(path), "config file not created"
-    assert cfg.config_path == path, 'config path is incorrect'
-    assert cfg.read() == dict(), 'empty config not loaded from file'
+    with pytest.raises(FileNotFoundError):
+        get_empty_config(conf_obj, path)
 
 
-def test_config_create_file_with_default_dict(get_root, monkeypatch, request):
+def test_config_create_file_with_default_dict(get_root, get_empty_config, monkeypatch):
     """ Test create new config file with default parameters """
     path = os.path.join(get_root, 'res', 'non_existent.yml')
-    default_conf = {'test': 'value'}
-    monkeypatch.setattr(Config, 'default_config', default_conf)
-    cfg = Config(path)
+    test_dict = {'this': 'test', 'test': 'de'}
+    monkeypatch.setattr(DeviceConfig, 'minimal_running_conf', test_dict)
+    cfg = get_empty_config(DeviceConfig, path)
+
     with open(path, 'r') as fh:
         content = yaml.load(fh, Loader=get_yaml_loader())
 
-    def config_td():
-        try:
-            os.remove(path)
-            os.remove(f"{path}.lock")
-        except FileNotFoundError:
-            pass
-        except Exception:
-            raise
-
-    request.addfinalizer(config_td)
-
-    assert cfg.default_config == default_conf, "monkeypatch doesn't work"
     assert cfg.config_path == path, "config path is incorrect"
-    assert content == default_conf, "config not written to file"
-    assert cfg.data == default_conf, "default config not loaded from file"
+    assert cfg.minimal_running_conf == test_dict, "bad minimal running"
+    assert content == test_dict, "config not written to file"
+    assert cfg.data == test_dict, "default config not loaded from file"
 
 
 def test_config_system_init_base(get_config, default_config):
@@ -192,8 +170,8 @@ def test_config_device_reset(get_config, config_dict):
     cfg.save()
     new_conf = cfg.load()
 
-    assert cfg.data == cfg.default_config, 'failed to apply default config'
-    assert new_conf == cfg.default_config, 'failed to load default config'
+    assert cfg.data == cfg.minimal_running_conf, 'failed to apply default config'
+    assert new_conf == cfg.minimal_running_conf, 'failed to load default config'
 
 
 def test_file_lock_context(get_config, monkeypatch):

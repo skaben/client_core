@@ -14,28 +14,27 @@ loggers = {}
 class Config:
 
     filtered_keys = list()
-    default_config = dict()
+    minimal_running_conf = dict()
 
     def __init__(self, config_path):
         self.data = dict()
         self.config_path = config_path
         if not config_path:
             raise Exception(f'config path is missing for {self}')
-        self.update(self.read())
+        current = self.read()
+        self.update(current)
 
     def read(self):
         """ Reads from config file """
         try:
             with FileLock(self.config_path):
                 with open(self.config_path, 'r') as fh:
-                    return yaml.load(fh, Loader=ExtendedLoader)
-        except FileNotFoundError:
-            self.write(self.default_config, 'w+')
-            return self.default_config
-        except yaml.YAMLError:
-            raise
+                    res = yaml.load(fh, Loader=ExtendedLoader)
+                    if not res:
+                        raise EOFError
         except Exception:
             raise
+        return res
 
     def write(self, data=None, mode='w'):
         """ Writes to config file """
@@ -70,7 +69,7 @@ class Config:
 
     def reset(self):
         """ Reset to default conf """
-        self.data = self.default_config
+        self.data = self.minimal_running_conf
 
 
 class SystemConfig(Config):
@@ -94,7 +93,8 @@ class SystemConfig(Config):
         })
 
     def write(self, data=None, mode=None):
-        raise PermissionError('SystemConfig is read-only by design')
+        raise PermissionError('System config cannot be created automatically. '
+                              'Seems like config file is missing or corrupted.')
 
     def logger(self, file_path=None, log_level=None):
         """ Make logger """
@@ -129,8 +129,8 @@ class DeviceConfig(Config):
         Local data persistent storage operations
     """
 
-    default_config = {
-        'dev_type': 'not_used',
+    minimal_running_conf = {
+        'dev_type': 'not_used'
     }
 
     def __init__(self, config_path):
@@ -138,11 +138,31 @@ class DeviceConfig(Config):
         self.filtered_keys.extend(['message'])
         super().__init__(config_path)
 
+    def write_default(self):
+        """ Create config file and write default configuration to it """
+        if not self.minimal_running_conf:
+            raise RuntimeError('missing minimal running config, nothing to write')
+        try:
+            self.write(self.minimal_running_conf, 'w+')
+        except PermissionError as e:
+            raise PermissionError(f'config file permission error: {e}')
+        except Exception:
+            raise
+        return self.minimal_running_conf
+
+    def read(self):
+        try:
+            config = super().read()
+        except (EOFError, FileNotFoundError, yaml.YAMLError):
+            # file is empty or not created or corrupted, rewrite with default conf
+            config = self.write_default()
+        return config
+
     def load(self):
         """ Load and apply state from file """
         if not self.read():
             # set config to default values
-            self.data = self.default_config
+            self.data = self.minimal_running_conf
             self.write()
             return self.data
         else:
