@@ -36,7 +36,6 @@ def get_config(request):
     def _wrap(config_obj, config_dict, **kwargs):
         path = write_config(config_dict, kwargs.get('fname', 'not_named.yml'))
         config = config_obj(path)
-        #config.update(config_dict)
 
         def _td():
             try:
