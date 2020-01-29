@@ -36,7 +36,28 @@ def get_config(request):
     def _wrap(config_obj, config_dict, **kwargs):
         path = write_config(config_dict, kwargs.get('fname', 'not_named.yml'))
         config = config_obj(path)
-        config.update(config_dict)
+        #config.update(config_dict)
+
+        def _td():
+            try:
+                os.remove(path)
+                os.remove(f"{path}.lock")
+            except FileNotFoundError:
+                pass
+            except Exception:
+                raise
+
+        request.addfinalizer(_td)
+        return config
+
+    return _wrap
+
+
+@pytest.fixture(scope="module")
+def get_empty_config(request):
+
+    def _wrap(config_obj, path):
+        config = config_obj(path)
 
         def _td():
             try:

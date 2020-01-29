@@ -84,6 +84,12 @@ class SoundLoader:
         except Exception:
             raise
 
+    def mute(self, channel, mute=True):
+        if mute:
+            self.channels.get(channel).set_volume(0)
+        else:
+            self.channels.get(channel).set_volume(1)
+
     def _snd(self, fname, volume=None):
         if not volume:
             volume = 1
