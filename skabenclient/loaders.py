@@ -56,9 +56,12 @@ class SoundLoader:
             logging.error(f'{sound_file} not found in {self.sound}')
         try:
             delay = kwargs.get('delay')
+            # compatibility with pygame.mixer.Sound named arguments
+            sound_kwargs = {k: kwargs.get(k) for k in kwargs
+                             if k in ['loops', 'maxtime', 'fade_ms']}
             if delay:
                 time.sleep(delay)
-            self.channels.get(channel).play(self.sound.get(sound))
+            self.channels.get(channel).play(self.sound.get(sound), **sound_kwargs)
         except Exception:
             raise
 
