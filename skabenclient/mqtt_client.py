@@ -32,6 +32,8 @@ class MQTTClient(Process):
         # MQTT broker
         self.broker_ip = config.get('broker_ip')
         self.broker_port = config.get('broker_port', 1883)
+        self.username = config.get('username')
+        self.password = config.get('password')
 
         if not self.broker_ip or not self.dev_type:
             logging.error('[!] cannot configure client, exiting...')
@@ -43,7 +45,9 @@ class MQTTClient(Process):
     def run(self):
         # MQTT client
         self.client = mqtt.Client(clean_session=True)
-        # define callbacks for MQTT
+        # authentication
+        self.client.username_pw_set(self.username, self.password)
+        # define callbacks for MQTT (laaaame)
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
         self.client.on_disconnect = self.on_disconnect

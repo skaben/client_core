@@ -8,9 +8,7 @@ from skabenclient.contexts import MQTTContext, EventContext
 class EventRouter(Thread):
 
     """
-        mr Slim Controller wannabe
-
-        routing internal queue events
+        Routing and handling queue events
 
         external queue used only for sending messages to server via MQTT
         new mqtt messages from server comes to internal queue from MQTTClient

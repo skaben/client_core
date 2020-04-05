@@ -13,8 +13,13 @@ loggers = {}
 
 class Config:
 
-    filtered_keys = list()
-    minimal_running_conf = dict()
+    """ Abstract config class
+
+        Provides methods for reading and writing .yml config file with filelock
+    """
+
+    not_stored_keys = list()  # fields should not be stored in .yml
+    minimal_essential_conf = dict()  # essential config
 
     def __init__(self, config_path):
         self.data = dict()
@@ -56,7 +61,7 @@ class Config:
         """ Filter keys starting with underscore and by filtered keys list """
         cfg = {k: v for k, v in payload.items()
                if not k.startswith('_')
-               and k not in self.filtered_keys}
+               and k not in self.not_stored_keys}
         return cfg
 
     def get(self, key, arg=None):
@@ -69,12 +74,17 @@ class Config:
 
     def reset(self):
         """ Reset to default conf """
-        self.data = self.minimal_running_conf
+        self.data = self.minimal_essential_conf
 
 
 class SystemConfig(Config):
 
     """ Basic app configuration """
+
+    uid = None
+    ip = None
+    q_int = None
+    q_ext = None
 
     def __init__(self, config_path=None, root=None):
         self.data = dict()
@@ -129,26 +139,26 @@ class DeviceConfig(Config):
         Local data persistent storage operations
     """
 
-    minimal_running_conf = {
-        'dev_type': 'not_used'
+    minimal_essential_conf = {
+        'dev_type': 'test'
     }
 
     def __init__(self, config_path):
         self.data = dict()
-        self.filtered_keys.extend(['message'])
+        self.not_stored_keys.extend(['message'])
         super().__init__(config_path)
 
     def write_default(self):
         """ Create config file and write default configuration to it """
-        if not self.minimal_running_conf:
-            raise RuntimeError('missing minimal running config, nothing to write')
+        if not self.minimal_essential_conf:
+            raise RuntimeError('missing minimal essential config, nothing to write')
         try:
-            self.write(self.minimal_running_conf, 'w+')
+            self.write(self.minimal_essential_conf, 'w+')
         except PermissionError as e:
             raise PermissionError(f'config file permission error: {e}')
         except Exception:
             raise
-        return self.minimal_running_conf
+        return self.minimal_essential_conf
 
     def read(self):
         try:
@@ -162,7 +172,7 @@ class DeviceConfig(Config):
         """ Load and apply state from file """
         if not self.read():
             # set config to default values
-            self.data = self.minimal_running_conf
+            self.data = self.minimal_essential_conf
             self.write()
             return self.data
         else:

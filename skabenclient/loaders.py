@@ -22,7 +22,11 @@ def get_yaml_loader():
 
 class SoundLoader:
 
-    """ Sound configurator """
+    """ Sound loader
+
+        Loads .ogg files from directory, set multiple sound channels by channel list,
+        provide play\stop\fade operations for loaded sounds
+     """
 
     enabled = None
 
@@ -48,6 +52,7 @@ class SoundLoader:
             self.channels[ch] = mixer.Channel(idx)
 
     def play(self, sound, channel, **kwargs):
+        """ Plays sound by selected channel """
         if not self.enabled:
             # stays silent
             return
@@ -58,7 +63,7 @@ class SoundLoader:
             delay = kwargs.get('delay')
             # compatibility with pygame.mixer.Sound named arguments
             sound_kwargs = {k: kwargs.get(k) for k in kwargs
-                             if k in ['loops', 'maxtime', 'fade_ms']}
+                            if k in ['loops', 'maxtime', 'fade_ms']}
             if delay:
                 time.sleep(delay)
             self.channels.get(channel).play(self.sound.get(sound), **sound_kwargs)
@@ -66,6 +71,7 @@ class SoundLoader:
             raise
 
     def stop(self, channel):
+        """ Stops all sound in selected channel """
         try:
             ch = self.channels.get(channel)
             if ch.get_busy():
@@ -74,6 +80,7 @@ class SoundLoader:
             raise
 
     def fadeout(self, fadeout_time, channels=None):
+        """ Fade out sound in selected channel list, or all"""
         mixer = list()
         if not channels:
             mixer = list(self.channels.values())
@@ -88,12 +95,14 @@ class SoundLoader:
             raise
 
     def mute(self, channel, mute=True):
+        """ Mute selected channel """
         if mute:
             self.channels.get(channel).set_volume(0)
         else:
             self.channels.get(channel).set_volume(1)
 
     def _snd(self, fname, volume=None):
+        """ Loads sound from .ogg to pygame mixer.Sound object """
         if not volume:
             volume = 1
 
@@ -109,7 +118,10 @@ class SoundLoader:
 
 class ImageLoader:
 
-    """ Image Loader class """
+    """ Image Loader class
+
+        Loads images from directories, scaling images, provide pygame image objects.
+    """
 
     def __init__(self, image_dir):
         self.images = {}
