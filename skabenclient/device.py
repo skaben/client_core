@@ -5,8 +5,9 @@ from skabenclient.helpers import make_event
 class BaseDevice:
 
     """ Abstract device handler class.
+
         Handling user input and end device state.
-        All persistent storage operations and server interactions is performed by managers
+        All persistent storage operations and server interactions is performed by contexts
     """
 
     config_class = DeviceConfig
@@ -21,26 +22,24 @@ class BaseDevice:
         self.config.load()
 
     def run(self):
+        """ Abstract method for run device """
         raise NotImplementedError(f"{self} is abstract and cannot be started")
 
     def state_update(self, data):
-        """ Update device configuration from user actions """
+        """ Update device configuration from user actions
+
+            When new data from user actions received, check current config and if changed,
+            send new event to inner event queue for local config change.
+        """
         if not isinstance(data, dict):
             self.logger.error('message type not dict: {}\n{}'.format(type(data), data))
             return
-        # self.config.set('alert', 0)  # resetting alert # TODO: what's happening here??
-        # delta_keys used later for sending package to server
         delta = {}
-        self.logger.debug('plot was {}'.format(self.config))
         for key in data:
             # make diff
             old_value = self.config.get(key, None)
             if data[key] != old_value:
                 delta[key] = data[key]
-        # self.config.save(payload=delta)
-        # if state changed - send event
-        # self.logger.debug('new user event from {}'.format(delta))
-        self.logger.debug('plot now {}'.format(self.config))
         if delta:
             delta['uid'] = self.uid
             event = make_event('device', 'input', delta)
@@ -48,11 +47,9 @@ class BaseDevice:
             return event
         # else do nothing - for mitigating possible loop in q_int 'device'
 
-    def reset(self):
-        """ Resetting from saved config """
-        # TODO: define what the fuck is happening here
-        self.config.load()
-        self.logger.debug('resetting with plot\n\t{}'.format(self.config))
+    def state_reload(self):
+        """ Re-read and apply device saved state """
+        return self.config.load()
 
     def send_message(self, data):
         """ Send message to server """
