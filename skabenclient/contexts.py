@@ -66,7 +66,8 @@ class BaseContext:
 
 class MQTTContext(BaseContext):
     """ MQTT context manager
-        parsing mqtt messages, send responses, proceed to device handlers
+
+        parsing mqtt messages, send responses, pass events to device handlers
     """
 
     def __init__(self, config):
@@ -176,9 +177,9 @@ class EventContext(BaseContext):
             else:
                 logging.error('missing data from event: {}'.format(event))
         elif event.cmd == 'reload':
-            # just reload device with current plot
+            # just reload device with saved plot
             logging.debug('event is {} - reloading device'.format(event))
-            return self.device.config.load()
+            return self.device.state_reload()
         else:
             logging.error('bad event {}'.format(event))
 
@@ -232,7 +233,7 @@ class EventContext(BaseContext):
                             task_id=task_id)
             encoded = p.encode(packet, self.ts)
             self.q_ext.put(encoded)
-#
+
 #    def send_config_internal(self, msg):
 #        """ Deprecated because of class merge """
 #        event = make_event('device', 'send', msg)
