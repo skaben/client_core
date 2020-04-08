@@ -69,14 +69,14 @@ def test_config_create_file_with_default_dict(get_root, get_empty_config, monkey
     """ Test create new config file with default parameters """
     path = os.path.join(get_root, 'res', 'non_existent.yml')
     test_dict = {'this': 'test', 'test': 'de'}
-    monkeypatch.setattr(DeviceConfig, 'minimal_running_conf', test_dict)
+    monkeypatch.setattr(DeviceConfig, 'minimal_essential_conf', test_dict)
     cfg = get_empty_config(DeviceConfig, path)
 
     with open(path, 'r') as fh:
         content = yaml.load(fh, Loader=get_yaml_loader())
 
     assert cfg.config_path == path, "config path is incorrect"
-    assert cfg.minimal_running_conf == test_dict, "bad minimal running"
+    assert cfg.minimal_essential_conf == test_dict, "bad minimal running"
     assert content == test_dict, "config not written to file"
     assert cfg.data == test_dict, "default config not loaded from file"
 
@@ -170,8 +170,8 @@ def test_config_device_reset(get_config, config_dict):
     cfg.save()
     new_conf = cfg.load()
 
-    assert cfg.data == cfg.minimal_running_conf, 'failed to apply default config'
-    assert new_conf == cfg.minimal_running_conf, 'failed to load default config'
+    assert cfg.data == cfg.minimal_essential_conf, 'failed to apply default config'
+    assert new_conf == cfg.minimal_essential_conf, 'failed to load default config'
 
 
 def test_file_lock_context(get_config, monkeypatch):

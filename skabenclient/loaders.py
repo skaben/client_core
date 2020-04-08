@@ -25,7 +25,7 @@ class SoundLoader:
     """ Sound loader
 
         Loads .ogg files from directory, set multiple sound channels by channel list,
-        provide play\stop\fade operations for loaded sounds
+        provide play\stop\\fade operations for loaded sounds
      """
 
     enabled = None
