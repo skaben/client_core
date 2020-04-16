@@ -34,6 +34,7 @@ class EventRouter(Thread):
                 time.sleep(.1)
                 continue
             try:
+                # TODO: NAKOORENO
                 event = self.q_int.get()
                 if event.type == 'mqtt':
                     # get packets with label 'mqtt' (from server)
@@ -41,7 +42,7 @@ class EventRouter(Thread):
                         mqtt.manage(event)
                 elif event.type == 'device':
                     if event.cmd == 'exit':
-                        # catch exit from end device, stopping app
+                        # catch exit from end device, stopping skaben
                         self.q_ext.put(('exit', 'message'))
                         self.stop()
                     else:
@@ -65,7 +66,7 @@ def start_app(app_config,
               event_context=EventContext):
     """ Start application
 
-        app_config: system app config object
+        app_config: system skaben config object
         device: end device for user interactions
         event_context: device events controller
 

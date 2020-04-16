@@ -1,11 +1,12 @@
 version: "3"
 
 services:
-  skb_test:
+  skabenclient:
     build:
       context: .
     volumes:
-      - ./skabenclient:/skabenclient
-      - ./testing:/testing
-    command: sh -c
-      "/testing/start.sh"
+      - .:/app
+    command: >
+       sh -c "flake8 /app/skabenclient && \
+              pytest /app/skabenclient && \
+              /app/deploy_to_repo.sh"

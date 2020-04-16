@@ -15,11 +15,13 @@ class BaseDevice:
     def __init__(self, system_config, device_config_path):
         if not isinstance(system_config, SystemConfig):
             raise Exception(f'config object is not a SystemConfig, but {type(system_config)} instead')
+        # get only necessary from system config
         self.q_int = system_config.get('q_int')
         self.uid = system_config.get('uid')
         self.logger = system_config.logger()
+        # assign device ingame config
         self.config = self.config_class(device_config_path)
-        self.config.load()
+        self.config.load()  # load and update current running conf
 
     def run(self):
         """ Abstract method for run device """

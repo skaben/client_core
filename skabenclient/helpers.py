@@ -77,7 +77,7 @@ class MQTTEvent(Event):
 
 
 def make_event(_type, cmd, data=None):
-    # todo: err handling
+    """ event making interface """
     try:
         if _type == 'mqtt':
             event = MQTTEvent(_type, cmd, data)
