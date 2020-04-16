@@ -10,7 +10,6 @@ from skabenclient.device import BaseDevice
 from skabenclient.config import SystemConfig, DeviceConfig
 from skabenclient.contexts import MQTTContext, EventContext
 
-# TODO: rewrite config system
 
 @pytest.fixture
 def get_router(get_config, default_config):

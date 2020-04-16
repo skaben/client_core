@@ -79,7 +79,7 @@ class Config:
 
 class SystemConfig(Config):
 
-    """ Basic app configuration """
+    """ Basic skaben configuration """
 
     uid = None
     ip = None
@@ -90,16 +90,21 @@ class SystemConfig(Config):
         self.data = dict()
         self.root = root if root else os.path.abspath(os.path.dirname(__file__))
         super().__init__(config_path)
+
         iface = self.data.get('iface')
+        dev_type = self.data.get('dev_type')
+        uid = get_mac(iface)
 
         if not iface:
             raise Exception('network interface missing in config')
 
         self.update({
-            'uid': get_mac(iface),
+            'uid': uid,
             'ip': get_ip(iface),
             'q_int': mp.Queue(),
             'q_ext': mp.Queue(),
+            'listen': [dev_type, f"{dev_type}/{uid}"],
+            'publish': f'ask/{dev_type}/{uid}'
         })
 
     def write(self, data=None, mode=None):
@@ -139,9 +144,7 @@ class DeviceConfig(Config):
         Local data persistent storage operations
     """
 
-    minimal_essential_conf = {
-        'dev_type': 'test'
-    }
+    minimal_essential_conf = {}
 
     def __init__(self, config_path):
         self.data = dict()
@@ -170,13 +173,16 @@ class DeviceConfig(Config):
 
     def load(self):
         """ Load and apply state from file """
-        if not self.read():
-            # set config to default values
-            self.data = self.minimal_essential_conf
-            self.write()
-            return self.data
-        else:
+        try:
+            current_conf = self.read()
+            if not current_conf:
+                raise Exception('config inconsistency')
+            for k in self.minimal_essential_conf:
+                if k not in current_conf:
+                    raise Exception('config inconsistency')
             return self.update(self.read())
+        except Exception:
+            return self.write_default()
 
     def save(self, payload=None):
         """ Apply and save persistent state """

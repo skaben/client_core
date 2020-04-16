@@ -1,10 +1,11 @@
 import os
 import random
 import logging
-import netifaces as netif
 
 import skabenproto as sk
 from skabenclient.helpers import make_event
+
+# TODO: merge Router with contexts elegant way...
 
 
 class BaseContext:
@@ -17,30 +18,25 @@ class BaseContext:
     def __init__(self, config):
         self.sys_conf = config.data
         self.logger = config.logger()
+
         self.q_int = self.sys_conf.get('q_int')
         if not self.q_int:
-            raise Exception('internal queue not declared')
+            raise Exception('internal event queue not declared')
+
         self.q_ext = self.sys_conf.get('q_ext')
         if not self.q_ext:
-            raise Exception('external (to mqtt) queue not declared')
+            raise Exception('external (to server) event queue not declared')
+
         # keepalive TS management
         self.ts_fname = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ts')
         if not os.path.exists(self.ts_fname):
             with open(self.ts_fname, 'w') as fh:
                 fh.write('0')
+
         self.ts = self._last_ts()
         self.dev_type = self.sys_conf.get('dev_type')
         self.uid = self.sys_conf.get('uid')
         self.reply_channel = self.dev_type + 'ask'
-
-    def get_ip_addr(self):
-        """ Get IP address by interface name """
-        try:
-            iface = self.sys_conf.get('iface')
-            self.ip = netif.ifaddresses(iface)[netif.AF_INET][0]['addr']
-            return self.ip
-        except Exception:
-            raise
 
     def _last_ts(self):
         """ Read previous timestamp value from 'ts' file """
@@ -152,6 +148,7 @@ class EventContext(BaseContext):
             raise Exception(f'{self} error: device not provided')
 
     def manage(self, event):
+        """ Managing events based on type """
         if event.cmd == 'update':
             # receive update from server
             logging.debug('event is {} WITH DATA {}'.format(event, event.data))
@@ -233,9 +230,3 @@ class EventContext(BaseContext):
                             task_id=task_id)
             encoded = p.encode(packet, self.ts)
             self.q_ext.put(encoded)
-
-#    def send_config_internal(self, msg):
-#        """ Deprecated because of class merge """
-#        event = make_event('device', 'send', msg)
-#        self.q_int.put(event)
-#        return f'sending message: {msg}'

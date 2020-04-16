@@ -1,5 +1,0 @@
---index-url https://pypi.fury.io/zerthmonk/
---extra-index-url https://pypi.org/simple/
-
-pytest
-flake8

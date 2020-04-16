@@ -44,6 +44,8 @@
 - `q_int` - очередь внутренними событиями между компонентами
 - `q_ext` - очередь сообщений к серверу
 
+сюда же входят параметры `dev_type`, `uid`, `broker_ip`, `iface`
+
 Файл: по умолчанию `./conf/system_config.yml` создается из `./templates/system_config.yml.template` при развертывании приложения (скрипт `deploy.sh`) 
 
 #### `DeviceConfig`

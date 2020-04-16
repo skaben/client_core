@@ -9,12 +9,12 @@ with open('requirements.txt', 'r') as f:
 
 setup(
     name='skabenclient',
-    version='0.5.13',
+    version='0.5.15',
     description='SKABEN client ',
     license="MIT",
     long_description=long_description,
     author='Zerthmonk',
-    author_email='me@tangled.link',
+    author_email='zerthmonk@pm.me',
     url="dungeon.tangled.link",
     packages=['skabenclient'], 
     install_requires=requirements_list,
