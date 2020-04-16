@@ -11,5 +11,5 @@ build:
     - docker version # verify docker cli is there. Also prints server info 
     - docker-compose version # verify the docker-compose cli is there
     - docker-compose up -d --build # building containers
-#    - docker-compose run app sh -c "pytest && flake8"
+#    - docker-compose run skaben sh -c "pytest && flake8"
     - docker-compose down

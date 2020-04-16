@@ -24,10 +24,9 @@ class MQTTClient(Process):
         self.q_ext = config.get('q_ext')
 
         # Device
-        self.dev_type = config.get('dev_type')
-        self.uid = config.get('uid')  # uid
-        self.publish = self.dev_type + 'ask'
         self.skip_until = 0
+        self.publish = config.get('publish')
+        self.listen = config.get('listen')
 
         # MQTT broker
         self.broker_ip = config.get('broker_ip')
@@ -35,12 +34,9 @@ class MQTTClient(Process):
         self.username = config.get('username')
         self.password = config.get('password')
 
-        if not self.broker_ip or not self.dev_type:
-            logging.error('[!] cannot configure client, exiting...')
+        if not self.broker_ip:
+            logging.error('[!] cannot configure client, broker ip missing. exiting...')
             return
-
-        # set MQTT channels for subscription and publishing
-        self.listen = [self.dev_type, f"{self.dev_type}/{self.uid}"]  # listen all
 
     def run(self):
         # MQTT client
@@ -105,7 +101,7 @@ class MQTTClient(Process):
         except Exception:
             logging.exception('catch error in mqtt module: ')
         finally:
-            self.client.disconnect()
+            self.client.disconnect(rc=0)
 
     def on_connect(self, client, userdata, flags, rc):
         self.client.is_connected = True
@@ -117,10 +113,12 @@ class MQTTClient(Process):
             self.subscr_stat = "[!] subscription failed"
 
     def on_disconnect(self, client, userdata, flags, rc):
-        logging.debug('disconnected')
+        logging.debug('disconnected from broker')
         if rc != 0:
-            logging.warning('unexpected disconnect! will auto-reconnect')
-#        self.client.loop_stop()
+            logging.warning('that was unexpected. trying auto-reconnect in 1s...')
+            self.running = False
+            time.sleep(1)
+            self.run()
 
     def on_message(self, client, userdata, msg):
         """
