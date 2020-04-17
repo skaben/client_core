@@ -1,11 +1,12 @@
 import os
+import time
 import random
 import logging
 
-import skabenproto as sk
-from skabenclient.helpers import make_event
+from threading import Thread
 
-# TODO: merge Router with contexts elegant way...
+from skabenproto import packets as sp
+from skabenclient.helpers import make_event
 
 
 class BaseContext:
@@ -16,31 +17,30 @@ class BaseContext:
     event = dict()
 
     def __init__(self, config):
-        self.sys_conf = config.data
+        self.config = config
         self.logger = config.logger()
 
-        self.q_int = self.sys_conf.get('q_int')
+        self.q_int = self.config.get('q_int')
         if not self.q_int:
             raise Exception('internal event queue not declared')
 
-        self.q_ext = self.sys_conf.get('q_ext')
+        self.q_ext = self.config.get('q_ext')
         if not self.q_ext:
             raise Exception('external (to server) event queue not declared')
 
         # keepalive TS management
-        self.ts_fname = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ts')
-        if not os.path.exists(self.ts_fname):
-            with open(self.ts_fname, 'w') as fh:
+        self.timestamp_fname = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ts')
+        if not os.path.exists(self.timestamp_fname):
+            with open(self.timestamp_fname, 'w') as fh:
                 fh.write('0')
 
-        self.ts = self._last_ts()
-        self.dev_type = self.sys_conf.get('dev_type')
-        self.uid = self.sys_conf.get('uid')
-        self.reply_channel = self.dev_type + 'ask'
+        self.timestamp = self._last_ts()
+        self.uid = config.get('uid')
+        self.dev_type = config.get('dev_type')
 
     def _last_ts(self):
         """ Read previous timestamp value from 'ts' file """
-        with open(self.ts_fname, 'r') as fh:
+        with open(self.timestamp_fname, 'r') as fh:
             t = fh.read().rstrip()
             if t:
                 return int(t)
@@ -49,7 +49,7 @@ class BaseContext:
 
     def rewrite_ts(self, new_ts):
         """ Write timestamp value to file 'ts' """
-        with open(self.ts_fname, 'w') as fh:
+        with open(self.timestamp_fname, 'w') as fh:
             fh.write(str(int(new_ts)))
             return int(new_ts)
 
@@ -68,6 +68,8 @@ class MQTTContext(BaseContext):
 
     def __init__(self, config):
         super().__init__(config)
+        self.dev_type = config.get('dev_type')
+        self.uid = config.get('uid')
 
         # command table
         self.reactions = {
@@ -84,11 +86,11 @@ class MQTTContext(BaseContext):
         self.event = event
 
         my_ts = self._last_ts()
-        event_ts = int(event.payload.get('ts', '-1'))
+        event_ts = int(event.datahold.get('ts', '-1'))
 
         if event.server_cmd == 'WAIT':
             # push me to the future
-            self.rewrite_ts(event_ts + event.payload['timeout'])
+            self.rewrite_ts(event_ts + event.datahold['timeout'])
             return
 
         if event_ts < my_ts:
@@ -107,24 +109,22 @@ class MQTTContext(BaseContext):
 
     def pong(self):
         """ Send PONG packet via MQTT """
-        with sk.PacketEncoder() as p:
-            packet = p.load('PONG',
-                            dev_type=self.reply_channel,
-                            uid=self.uid)
-            encoded = p.encode(packet, self.ts)
-            self.q_ext.put(encoded)
+        packet = sp.PONG(dev_type=self.dev_type,
+                         uid=self.uid,
+                         timestamp=self.timestamp)
+        self.q_ext.put(packet.encode())
 
     def wait(self):
         """ Waiting for timeout """
-        to = self.event.payload.get('timeout', 0)\
-            + self.event.payload.get('ts')
+        to = self.event.datahold.get('timeout', 0)\
+            + self.event.datahold.get('ts')
         self.skip_until = to
 
     def local_update(self):
         """ Updating local device state from MQTT event
             Event should be handled by device handler respectively
         """
-        event = make_event('device', 'update', self.event.payload)
+        event = make_event('device', 'update', self.event.datahold)
         self.q_int.put(event)
 
     def local_send(self, fields=None):
@@ -187,34 +187,28 @@ class EventContext(BaseContext):
             return
         data = {k: v for k, v in data.items() if k not in self.filtered_keys}
         # send update to server DB
-        with sk.PacketEncoder() as p:
-            packet = p.load('SUP',
-                            uid=self.uid,
-                            dev_type=self.reply_channel,
-                            task_id=self.task_id,
-                            payload=data)
-            # add IP as additional field
-            # packet.payload.update({'ip': self.config['ip']})
-            encoded = p.encode(packet, self.ts)
-            self.q_ext.put(encoded)
+        packet = sp.SUP(dev_type=self.dev_type,
+                        uid=self.uid,
+                        task_id=self.task_id,
+                        timestamp=self.timestamp,
+                        datahold=data)
+        self.q_ext.put(packet.encode())
 
     def config_reply(self, keys=None):
-        current = self.device.config.get_current()
+        current = self.device.config.data
         if not current:
             current = self.device.config.load()
         if keys:
-            payload = {'request': [k for k in current if k in keys]}
+            datahold = {'request': [k for k in current if k in keys]}
         else:
-            payload = {'request': 'all'}  # full conf
+            datahold = {'request': 'all'}  # full conf
 
-        with sk.PacketEncoder() as p:
-            packet = p.load('CUP',
-                            dev_type=self.reply_channel,
-                            uid=self.uid,
-                            task_id=self.task_id,
-                            payload=payload)
-            encoded = p.encode(packet, self.ts)
-            self.q_ext.put(encoded)
+        packet = sp.CUP(dev_type=self.dev_type,
+                        uid=self.uid,
+                        timestamp=self.timestamp,
+                        task_id=self.task_id,
+                        datahold=datahold)
+        self.q_ext.put(packet.encode())
 
     def confirm_update(self, task_id, packet_type='ACK'):
         """ Confirm to server that we received and applied config
@@ -223,10 +217,63 @@ class EventContext(BaseContext):
         if packet_type not in ('ACK', 'NACK'):
             raise Exception(f'packet type not ACK or NACK: {packet_type}')
 
-        with sk.PacketEncoder() as p:
-            packet = p.load(packet_type,
-                            dev_type=self.reply_channel,
-                            uid=self.uid,
-                            task_id=task_id)
-            encoded = p.encode(packet, self.ts)
-            self.q_ext.put(encoded)
+        packet_class = getattr(sp, packet_type)
+        packet = packet_class(dev_type=self.dev_type,
+                              timestamp=self.timestamp,
+                              uid=self.uid,
+                              task_id=task_id)
+        self.q_ext.put(packet.encode())
+
+
+class Router(Thread):
+
+    """
+        Routing and handling queue events
+
+        external queue used only for sending messages to server via MQTT
+        new mqtt messages from server comes to internal queue from MQTTClient
+        queues separated because of server messages top priority
+    """
+
+    def __init__(self, config):
+        super().__init__()
+        self.daemon = True
+        self.running = False
+        self.q_int = config.get("q_int")
+        self.q_ext = config.get("q_ext")
+        self.logger = config.logger()
+        self.config = config  # for passing to contexts
+
+    def run(self):
+        """ Routing events from internal queue """
+        self.logger.debug('router module starting...')
+        self.running = True
+        while self.running:
+            if self.q_int.empty():
+                time.sleep(.1)
+                continue
+            try:
+                event = self.q_int.get()
+                if event.type == 'mqtt':
+                    # get packets with label 'mqtt' (from server)
+                    with MQTTContext(self.config) as mqtt:
+                        mqtt.manage(event)
+                elif event.type == 'device':
+                    if event.cmd == 'exit':
+                        # catch exit from end device, stopping skaben
+                        self.q_ext.put(('exit', 'message'))
+                        self.stop()
+                    else:
+                        # passing to event context manager
+                        with EventContext(self.config) as context:
+                            context.manage(event)
+                else:
+                    self.logger.error('cannot determine message type for:\n{}'.format(event))
+            except Exception:
+                self.logger.exception('exception in manager context:')
+                self.stop()
+
+    def stop(self):
+        """ Full stop """
+        self.logger.debug('router module stopping...')
+        self.running = False

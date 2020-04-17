@@ -16,8 +16,6 @@ _devconfig = {'str': {'device': 'testing',
                        'blocked': False}
 }
 
-# TODO: config with empty device file
-
 
 def test_config_init(get_config):
     """ Test initializes Config """
@@ -85,7 +83,8 @@ def test_config_system_init_base(get_config, default_config):
     """ Test creates SystemConfig """
     config = default_config('sys')
     cfg = get_config(SystemConfig, config)
-    test_keys = ['q_int', 'q_ext', 'ip', 'uid'] + list(config.keys())
+    test_keys = ['q_int', 'q_ext', 'ip', 'uid', 'listen', 'publish'] \
+                + list(config.keys())
     conf_keys = list(cfg.data.keys())
     test_keys.sort()
     conf_keys.sort()
@@ -120,13 +119,37 @@ def test_config_system_logger_fpath(get_config, default_config):
             assert fname == file_path, 'wrong file path passed to logger handler'
 
 
-@pytest.mark.parametrize('config_dict', _devconfig.values())
-def test_config_device_init(get_config, config_dict):
+def test_config_device_init(get_config, monkeypatch):
     """ Test creates DeviceConfig """
-    cfg = get_config(DeviceConfig, config_dict)
+    # WARN: this monkeypatching hardcoded on _devconfig keys
+    # setattr for passing DeviceConfig.read() consistency check
+    monkeypatch.setattr(DeviceConfig, 'minimal_essential_conf', {'int': 1})
+    cfg = get_config(DeviceConfig, _devconfig)
 
     assert isinstance(cfg, DeviceConfig), 'wrong class'
-    assert cfg.data == config_dict, 'bad config loaded'
+    assert cfg.data == _devconfig, 'bad config loaded'
+
+
+def test_config_device_init_with_defaults(get_config, monkeypatch):
+    """ Test creates DeviceConfig with minimal essential conf """
+    # WARN: this monkeypatching hardcoded on _devconfig keys
+    # setattr for passing DeviceConfig.read() consistency check
+    not_devconfig = {'not_presented': 1}
+    monkeypatch.setattr(DeviceConfig, 'minimal_essential_conf', not_devconfig)
+    cfg = get_config(DeviceConfig, _devconfig)
+
+    assert isinstance(cfg, DeviceConfig), 'wrong class'
+    assert cfg.data == not_devconfig, 'bad config loaded'
+
+
+@pytest.mark.parametrize('config_dict', (_devconfig,))
+def test_config_device_save(get_config, config_dict):
+    """ Test DeviceConfig save (update and write) """
+    cfg = get_config(DeviceConfig, config_dict)
+    cfg.save()
+    with open(cfg.config_path, 'r') as fh:
+        yml = yaml.load(fh.read(), Loader=get_yaml_loader())
+    assert yml == config_dict, f'saved {yml} instead of {config_dict}'
 
 
 def test_config_device_get_set(get_config):
@@ -141,17 +164,7 @@ def test_config_device_get_set(get_config):
     assert cfg.get('blocked') is False, 'bad setter'
 
 
-@pytest.mark.parametrize('config_dict', _devconfig.values())
-def test_config_device_save(get_config, config_dict):
-    """ Test DeviceConfig save (update and write) """
-    cfg = get_config(DeviceConfig, config_dict)
-    cfg.save()
-    with open(cfg.config_path, 'r') as fh:
-        yml = yaml.load(fh.read(), Loader=get_yaml_loader())
-    assert yml == config_dict, f'saved {yml} instead of {config_dict}'
-
-
-@pytest.mark.parametrize('config_dict', _devconfig.values())
+@pytest.mark.parametrize('config_dict', (_devconfig,))
 def test_config_device_load(get_config, config_dict):
     """ Test DeviceConfig load (read and update) """
     cfg = get_config(DeviceConfig, config_dict)
@@ -162,21 +175,66 @@ def test_config_device_load(get_config, config_dict):
     assert cfg.data == config_dict, 'data not loaded'
 
 
-@pytest.mark.parametrize('config_dict', _devconfig.values())
-def test_config_device_reset(get_config, config_dict):
+def test_config_device_reset(get_config, monkeypatch):
     """ Test DeviceConfig reset to default parameters """
-    cfg = get_config(DeviceConfig, config_dict)
-    cfg.reset()
+    monkeypatch.setattr(DeviceConfig, 'minimal_essential_conf', {'test': 'conf'})
+    cfg = get_config(DeviceConfig, _devconfig)
     cfg.save()
+    cfg.write_default()
     new_conf = cfg.load()
 
     assert cfg.data == cfg.minimal_essential_conf, 'failed to apply default config'
     assert new_conf == cfg.minimal_essential_conf, 'failed to load default config'
 
 
-def test_file_lock_context(get_config, monkeypatch):
+def test_config_device_restore_empty(get_config, write_config_fixture, monkeypatch):
+    """ Test DeviceConfig restore when file is corrupted """
+    fname = 'will_be_empty.yml'
+    # saving normal conf
+    is_default = {'test': 'conf'}
+    monkeypatch.setattr(DeviceConfig, 'minimal_essential_conf', is_default)
+    cfg = get_config(DeviceConfig, _devconfig, fname=fname)
+    cfg.save()
+    write_config_fixture('', fname)
+    should_be_default = cfg.read()
+
+    assert should_be_default == is_default, 'configs not matched'
+
+
+def test_config_device_restore_broken(get_config, write_config_fixture, monkeypatch):
+    """ Test DeviceConfig restore when file is corrupted """
+    fname = 'will_be_broken.yml'
+    # saving normal conf
+    is_default = {'test': 'conf'}
+    monkeypatch.setattr(DeviceConfig, 'minimal_essential_conf', is_default)
+    cfg = get_config(DeviceConfig, _devconfig, fname=fname)
+    cfg.save()
+    write_config_fixture('<< EOF >>', fname)
+    should_be_default = cfg.read()
+
+    assert should_be_default == is_default, 'configs not matched'
+
+@pytest.mark.parametrize('config_dict', (_devconfig,))
+def test_config_device_restore_missing(get_config, config_dict, monkeypatch, write_config_fixture):
+    """ Test DeviceConfig restore when file is corrupted """
+    fname = 'will_be_missing.yml'
+    # saving normal conf
+    is_default = {'test': 'conf'}
+    monkeypatch.setattr(DeviceConfig, 'minimal_essential_conf', is_default)
+    cfg = get_config(DeviceConfig, config_dict, fname=fname)
+    cfg.save()
+    path = write_config_fixture('corrupted_string', fname)
+    os.remove(path)
+    # trying to read from non-existent file
+    should_be_default = cfg.read()
+
+    assert should_be_default == is_default, 'configs not matched'
+
+
+@pytest.mark.parametrize('config_dict', (_devconfig,))
+def test_file_lock_context(get_config, config_dict):
     """ Test FileLock release """
-    cfg = get_config(DeviceConfig, _devconfig.get('str'))
+    cfg = get_config(DeviceConfig, config_dict.get('str'))
     file_lock = FileLock(cfg.config_path)
     # acquire lock context
     with file_lock:
@@ -192,9 +250,10 @@ def test_file_lock_context(get_config, monkeypatch):
     assert file_lock.lock_path == f"{cfg.config_path}.lock"
 
 
-def test_file_lock_busy(get_config, monkeypatch):
+@pytest.mark.parametrize('config_dict', (_devconfig,))
+def test_file_lock_busy(get_config, monkeypatch, config_dict):
     """ Test FileLock when file locked """
-    cfg = get_config(DeviceConfig, _devconfig.get('str'))
+    cfg = get_config(DeviceConfig, config_dict.get('str'))
     # just ignore time sleep
     monkeypatch.setattr(time, 'sleep', lambda x: None)
     file_lock = FileLock(cfg.config_path, timeout=.1)
