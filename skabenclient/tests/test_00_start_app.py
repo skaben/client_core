@@ -3,12 +3,12 @@ import pytest
 import threading
 from queue import Queue
 
-from skabenclient.main import EventRouter, start_app
+from skabenclient.main import start_app
 from skabenclient.helpers import make_event
 from skabenclient.mqtt_client import MQTTClient
 from skabenclient.device import BaseDevice
 from skabenclient.config import SystemConfig, DeviceConfig
-from skabenclient.contexts import MQTTContext, EventContext
+from skabenclient.contexts import MQTTContext, EventContext, Router
 
 
 @pytest.fixture
@@ -23,8 +23,8 @@ def get_router(get_config, default_config):
     # create device from system config
     device = BaseDevice(syscfg, devcfg.config_path)
     # assign device instance to config singleton
-    syscfg.set('device', device)
-    router = EventRouter(syscfg, EventContext)
+    syscfg.update({'device': device})
+    router = Router(syscfg)
 
     return router, syscfg, devcfg
 
@@ -46,7 +46,7 @@ def get_from_queue():
 
 def test_router_init(get_router):
     router, syscfg, devcfg = get_router
-    for attr in ('q_int', 'q_ext', 'event_context'):
+    for attr in ('q_int', 'q_ext'):
         assert hasattr(router, attr), f'missing attribute: {attr}'
     for attr in ('q_int', 'q_ext'):
         assert getattr(router, attr) == syscfg.data[attr], f"wrong value for {attr}"
@@ -63,19 +63,20 @@ def test_start_app_routine(get_config, default_config, get_from_queue, monkeypat
     syscfg = get_config(SystemConfig, default_config('sys'))
     # create device from system config
     device = BaseDevice(syscfg, devcfg.config_path)
+    syscfg.update({'device': device})
 
     test_queue = Queue()
 
     # Mqtt client is a process, monkeypatching "run" method not working because of it
     monkeypatch.setattr(MQTTClient, 'start', lambda *a: test_queue.put('mqtt'))
-    monkeypatch.setattr(EventRouter, 'run', lambda *a: test_queue.put('router'))
+    monkeypatch.setattr(Router, 'run', lambda *a: test_queue.put('router'))
     # BaseDevice is not a threading interface at all, so no join later
     monkeypatch.setattr(BaseDevice, 'run', lambda *a: test_queue.put('device'))
 
     monkeypatch.setattr(MQTTClient, 'join', lambda *a: True)
-    monkeypatch.setattr(EventRouter, 'join', lambda *a: True)
+    monkeypatch.setattr(Router, 'join', lambda *a: True)
 
-    start_app(app_config=syscfg, device=device, event_context=EventContext)
+    start_app(app_config=syscfg, device=device)
 
     result = list(get_from_queue(test_queue))
     for service in ['mqtt', 'router', 'device']:
