@@ -44,25 +44,14 @@ class Config:
     def write(self, data=None, mode='w'):
         """ Writes to config file """
         if not data:
-            data = self.get_values(self.data)
+            data = self.data
         try:
+            data = self._filter(data)
             with FileLock(self.config_path):
                 with open(self.config_path, mode) as fh:
-                    fh.write(yaml.dump(self.get_values(data)))
+                    fh.write(yaml.dump(self._filter(data)))
         except Exception:
             raise
-
-    def update(self, payload):
-        """ Updates local namespace from payload with basic filtering """
-        self.data.update(self.get_values(payload))
-        return self.data
-
-    def get_values(self, payload):
-        """ Filter keys starting with underscore and by filtered keys list """
-        cfg = {k: v for k, v in payload.items()
-               if not k.startswith('_')
-               and k not in self.not_stored_keys}
-        return cfg
 
     def get(self, key, arg=None):
         """ Get compatibility wrapper """
@@ -72,14 +61,22 @@ class Config:
         """ Set compatibility wrapper """
         return self.update({key: val})
 
-    def reset(self):
-        """ Reset to default conf """
-        self.data = self.minimal_essential_conf
+    def update(self, payload):
+        """ Updates local namespace from payload with basic filtering """
+        self.data.update(self._filter(payload))
+        return self.data
+
+    def _filter(self, payload):
+        """ Filter keys starting with underscore and by filtered keys list """
+        cfg = {k: v for k, v in payload.items()
+               if not k.startswith('_')
+               and k not in self.not_stored_keys}
+        return cfg
 
 
 class SystemConfig(Config):
 
-    """ Basic skaben configuration """
+    """ Basic skaben read-only configuration """
 
     uid = None
     ip = None
@@ -98,6 +95,7 @@ class SystemConfig(Config):
         if not iface:
             raise Exception('network interface missing in config')
 
+        # update config with session values, this will not be saved to file
         self.update({
             'uid': uid,
             'ip': get_ip(iface),
@@ -106,6 +104,8 @@ class SystemConfig(Config):
             'listen': [dev_type, f"{dev_type}/{uid}"],
             'publish': f'ask/{dev_type}/{uid}'
         })
+
+        # TODO: use listen/publish to pass as topic value to packets
 
     def write(self, data=None, mode=None):
         raise PermissionError('System config cannot be created automatically. '
@@ -141,7 +141,7 @@ class SystemConfig(Config):
 class DeviceConfig(Config):
 
     """
-        Local data persistent storage operations
+        Device configuration, read-write
     """
 
     minimal_essential_conf = {}
@@ -154,21 +154,29 @@ class DeviceConfig(Config):
     def write_default(self):
         """ Create config file and write default configuration to it """
         if not self.minimal_essential_conf:
-            raise RuntimeError('missing minimal essential config, nothing to write')
+            raise RuntimeError('minimal essential conf values is missing, '
+                               'config file cannot be reset to defaults')
         try:
-            self.write(self.minimal_essential_conf, 'w+')
+            self.data = self.minimal_essential_conf
+            self.write()
+            return self.data
         except PermissionError as e:
-            raise PermissionError(f'config file permission error: {e}')
+            raise PermissionError(f'config file write permission error: {e}')
         except Exception:
             raise
-        return self.minimal_essential_conf
 
     def read(self):
         try:
             config = super().read()
-        except (EOFError, FileNotFoundError, yaml.YAMLError):
+            # make a consistency check
+            if not set(self.minimal_essential_conf.keys()).issubset(set(config.keys())):
+                # check failed, essential keys missing
+                raise AttributeError
+        except (EOFError, FileNotFoundError, yaml.YAMLError, AttributeError):
             # file is empty or not created or corrupted, rewrite with default conf
             config = self.write_default()
+        except Exception:
+            raise
         return config
 
     def load(self):
@@ -188,8 +196,8 @@ class DeviceConfig(Config):
         """ Apply and save persistent state """
         if payload:
             self.update(payload)
-        return self.write(self.data)
+        return self.write()
 
-    def get_current(self):
+    def current(self):
         """ Get current config """
         return self.data

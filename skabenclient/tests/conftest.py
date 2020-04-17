@@ -31,6 +31,15 @@ def write_config(config, fname):
 
 
 @pytest.fixture(scope="module")
+def write_config_fixture():
+
+    def _wrap(config, fname):
+        return write_config(config, fname)
+
+    return _wrap
+
+
+@pytest.fixture(scope="module")
 def get_config(request):
 
     def _wrap(config_obj, config_dict, **kwargs):
