@@ -105,7 +105,7 @@ class SystemConfig(Config):
             'publish': f'ask/{dev_type}/{uid}'
         })
 
-        # TODO: use listen/publish to pass as topic value to packets
+        # TODO: rename it to pub/sub
 
     def write(self, data=None, mode=None):
         raise PermissionError('System config cannot be created automatically. '

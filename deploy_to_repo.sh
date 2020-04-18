@@ -1,8 +1,22 @@
 #!/usr/bin/env bash
 
 cd /app
+
+if [ ! -d ./venv ]; then
+  python3.7 -m venv venv
+  source ./venv/bin/activate
+  pip install --upgrade pip
+  pip install wheel
+fi
+
+if [ ! -d dist ]; then
+  rm -r ./dist ./build ./build_wheel
+fi
+
+
 mkdir dist
 
+. ./venv/bin/activate
 python setup.py build sdist bdist_wheel
 
 # pushing to repo
