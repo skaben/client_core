@@ -5,7 +5,7 @@ ENV PYTHONUBUFFERED=1
 ENV PATH="/venv/bin:$PATH"
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libglib2.0-0 iproute2
+    apt-get install -y --no-install-recommends libglib2.0-0 iproute2 curl
 
 COPY requirements.txt /requirements.txt
 

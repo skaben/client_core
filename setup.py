@@ -3,13 +3,13 @@ from setuptools import setup, find_packages
 with open("README.md", 'r') as f:
     long_description = f.read()
 
-with open('requirements.txt', 'r') as f:
+with open('deploy_requirements.txt', 'r') as f:
     requirements_list = f.readlines()
 
 
 setup(
     name='skabenclient',
-    version='0.5.15',
+    version='0.5.16.1',
     description='SKABEN client ',
     license="MIT",
     long_description=long_description,

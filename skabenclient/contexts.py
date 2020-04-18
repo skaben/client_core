@@ -144,6 +144,7 @@ class EventContext(BaseContext):
         super().__init__(config)
         self.task_id = ''.join([str(random.randrange(10)) for _ in range(10)])
         self.device = config.get('device')
+        self.dev_type = f'ask/{self.dev_type}'  # reply channel, rename it to topic already
         if not self.device:
             raise Exception(f'{self} error: device not provided')
 
@@ -182,8 +183,11 @@ class EventContext(BaseContext):
 
     def send_config(self, data):
         """ Send config to server """
-        if not data or not isinstance(data, dict):
-            logging.error('missing data to send')
+        if not data:
+            logging.error('missing data')
+            return
+        if not isinstance(data, dict):
+            logging.error(f'data is not a dict: {data}')
             return
         data = {k: v for k, v in data.items() if k not in self.filtered_keys}
         # send update to server DB
