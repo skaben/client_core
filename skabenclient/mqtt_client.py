@@ -7,6 +7,21 @@ from skabenclient.helpers import make_event
 import skabenproto as sk
 
 
+# some exceptions
+
+class MQTTError(Exception):
+    """ base mqtt error class """
+    pass
+
+
+class AuthError(MQTTError):
+    pass
+
+
+class ProtocolError(MQTTError):
+    pass
+
+
 class MQTTClient(Process):
 
     ch = dict()
@@ -61,14 +76,24 @@ class MQTTClient(Process):
             tries += 1
             print('connect try: {}, next try after {}s'.format(tries,
                                                                sleep_time))
+            exit_message = make_event('device', 'exit')
             try:
                 self.client.connect(host=self.broker_ip, port=self.broker_port)
                 self.client.loop()
             except (ConnectionRefusedError, OSError):
-                _errm = 'mqtt broker not available, waiting 30s'
+                sleep_time = 30
+                _errm = f'mqtt broker not available, waiting {sleep_time}s'
                 print(_errm)
                 logging.error(_errm)
-                sleep_time = 30
+            except AuthError:
+                logging.exception('auth error. system config should be fixed: ')
+                self.q_int.put(exit_message)
+            except ProtocolError:
+                logging.exception('protocol error. report immediately')
+                self.q_int.put(exit_message)
+            except Exception:
+                logging.exception('exception occured')
+                self.q_int.put(exit_message)
             time.sleep(sleep_time)
 
         self.client.loop_start()
@@ -104,6 +129,25 @@ class MQTTClient(Process):
             self.client.disconnect(rc=0)
 
     def on_connect(self, client, userdata, flags, rc):
+        """
+            On connect to broker
+        """
+
+        #_codes = list(
+        #    "Connection successful",
+        #    ProtocolError("Connection refused – incorrect protocol version"),
+        #    ProtocolError("Connection refused – invalid client identifier"),
+        #    ConnectionRefusedError("Connection refused – server unavailable"),
+        #    AuthError("Connection refused – bad username or password"),
+        #    AuthError("Connection refused – not authorised")
+        #)
+        #print(rc)
+        #rc_codes = enumerate(_codes)
+
+        #if rc != 0:
+        #    # connection failed
+        #    raise rc_codes.get(rc)
+
         self.client.is_connected = True
         try:
             for c in self.listen:
