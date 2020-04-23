@@ -7,6 +7,10 @@ from skabenclient.helpers import make_event
 import skabenproto as sk
 
 
+
+# TODO: [critical] manage connect status
+# TODO: [critical] report auth problems
+
 # some exceptions
 
 class MQTTError(Exception):
@@ -126,7 +130,7 @@ class MQTTClient(Process):
         except Exception:
             logging.exception('catch error in mqtt module: ')
         finally:
-            self.client.disconnect(rc=0)
+            self.client.disconnect()
 
     def on_connect(self, client, userdata, flags, rc):
         """

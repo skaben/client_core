@@ -145,6 +145,8 @@ class EventContext(BaseContext):
         super().__init__(config)
         self.task_id = ''.join([str(random.randrange(10)) for _ in range(10)])
         self.device = config.get('device')
+        # for event context topic is always pub
+        self.topic = self.config.get('pub')
         if not self.device:
             raise Exception(f'{self} error: device not provided')
 
