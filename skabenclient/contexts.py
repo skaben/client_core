@@ -35,8 +35,11 @@ class BaseContext:
                 fh.write('0')
 
         self.timestamp = self._last_ts()
+        self.topic = config.get('topic')
         self.uid = config.get('uid')
-        self.dev_type = config.get('dev_type')
+
+        if not self.topic:
+            raise Exception('improperly configured - system config missing topic')
 
     def _last_ts(self):
         """ Read previous timestamp value from 'ts' file """
@@ -68,8 +71,6 @@ class MQTTContext(BaseContext):
 
     def __init__(self, config):
         super().__init__(config)
-        self.dev_type = config.get('dev_type')
-        self.uid = config.get('uid')
 
         # command table
         self.reactions = {
@@ -109,7 +110,7 @@ class MQTTContext(BaseContext):
 
     def pong(self):
         """ Send PONG packet via MQTT """
-        packet = sp.PONG(dev_type=self.dev_type,
+        packet = sp.PONG(topic=self.topic,
                          uid=self.uid,
                          timestamp=self.timestamp)
         self.q_ext.put(packet.encode())
@@ -144,7 +145,6 @@ class EventContext(BaseContext):
         super().__init__(config)
         self.task_id = ''.join([str(random.randrange(10)) for _ in range(10)])
         self.device = config.get('device')
-        self.dev_type = f'ask/{self.dev_type}'  # reply channel, rename it to topic already
         if not self.device:
             raise Exception(f'{self} error: device not provided')
 
@@ -191,7 +191,7 @@ class EventContext(BaseContext):
             return
         data = {k: v for k, v in data.items() if k not in self.filtered_keys}
         # send update to server DB
-        packet = sp.SUP(dev_type=self.dev_type,
+        packet = sp.SUP(topic=self.topic,
                         uid=self.uid,
                         task_id=self.task_id,
                         timestamp=self.timestamp,
@@ -207,7 +207,7 @@ class EventContext(BaseContext):
         else:
             datahold = {'request': 'all'}  # full conf
 
-        packet = sp.CUP(dev_type=self.dev_type,
+        packet = sp.CUP(topic=self.topic,
                         uid=self.uid,
                         timestamp=self.timestamp,
                         task_id=self.task_id,
@@ -222,7 +222,7 @@ class EventContext(BaseContext):
             raise Exception(f'packet type not ACK or NACK: {packet_type}')
 
         packet_class = getattr(sp, packet_type)
-        packet = packet_class(dev_type=self.dev_type,
+        packet = packet_class(topic=self.topic,
                               timestamp=self.timestamp,
                               uid=self.uid,
                               task_id=task_id)

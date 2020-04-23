@@ -101,8 +101,8 @@ class SystemConfig(Config):
             'ip': get_ip(iface),
             'q_int': mp.Queue(),
             'q_ext': mp.Queue(),
-            'listen': [dev_type, f"{dev_type}/{uid}"],
-            'publish': f'ask/{dev_type}/{uid}'
+            'pub': f'ask/{dev_type}/{uid}',
+            'sub': [dev_type, f"{dev_type}/{uid}"],
         })
 
         # TODO: rename it to pub/sub
