@@ -8,8 +8,6 @@ from skabenclient.loaders import get_yaml_loader
 ExtendedLoader = get_yaml_loader()
 loggers = {}
 
-# TODO: config path generation, default config writing
-
 
 class Config:
 
@@ -89,7 +87,7 @@ class SystemConfig(Config):
         super().__init__(config_path)
 
         iface = self.data.get('iface')
-        dev_type = self.data.get('dev_type')
+        topic = self.data.get('topic')
         uid = get_mac(iface)
 
         if not iface:
@@ -101,8 +99,8 @@ class SystemConfig(Config):
             'ip': get_ip(iface),
             'q_int': mp.Queue(),
             'q_ext': mp.Queue(),
-            'pub': f'ask/{dev_type}/{uid}',
-            'sub': [dev_type, f"{dev_type}/{uid}"],
+            'pub': f'ask/{topic}',
+            'sub': [topic, f"{topic}/{uid}"],
         })
 
         # TODO: rename it to pub/sub

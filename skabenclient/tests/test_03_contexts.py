@@ -23,18 +23,7 @@ class MockMessage:
     def __init__(self, packet):
         self.topic = packet[0]
         self.payload = packet[1]
-
         self.decoded = json.loads(self.payload.decode('utf-8'))
-        topic = self.topic.split('/')
-
-        if len(topic) < 3:
-            raise Exception(f'missing topic fields in {topic}')
-
-        if topic[0] == 'ask':
-            self.topic = '/'.join(topic[:1])
-        else:
-            self.topic = topic[0]
-        self.uid, self.command = topic[-2:]
 
 
 @pytest.fixture
@@ -140,7 +129,6 @@ def test_event_context_send_config(event_setup, monkeypatch, default_config):
     """ Test send config to server """
     in_queue = list()
     syscfg = event_setup()
-    device = syscfg.get('device')
     _dict = {'new_value': 'newvalue'}
 
     with mgr.EventContext(syscfg) as context:
@@ -148,9 +136,8 @@ def test_event_context_send_config(event_setup, monkeypatch, default_config):
         context.send_config(_dict)
         message = MockMessage(in_queue[-1])
 
-    assert message.topic == context.topic, 'wrong device type'
-    assert message.uid == device.uid, 'wrong device UID'
-    assert message.command == 'SUP', 'wrong command'
+    packet_topic = '/'.join((context.topic, syscfg.get('uid'), 'SUP'))
+    assert message.topic == packet_topic, 'wrong message topic'
     assert message.decoded.get('timestamp') == 0, f'wrong device timestamp {message.decoded}'
     assert message.decoded['datahold'].get('new_value') == _dict.get('new_value'), f'bad data send: {message.decoded}'
 
@@ -210,5 +197,5 @@ def test_event_context_confirm_update_ack(event_setup, default_config, monkeypat
         context.confirm_update(packet_type=cmd, task_id=_task_id)
         message = MockMessage(in_queue[-1])
 
-        assert message.command == cmd
+        assert message.topic.split('/')[-1] == cmd
         assert message.decoded.get('task_id') == _task_id
