@@ -164,7 +164,7 @@ class MQTTClient(Process):
             time.sleep(1)
             self.run()
 
-    def on_messae(self, client, userdata, msg):
+    def on_message(self, client, userdata, msg):
         """
             Messae from MQTT broker received
         """
