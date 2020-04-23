@@ -13,7 +13,7 @@ def test_base_context(get_config, default_config):
     syscfg = get_config(SystemConfig, default_config('sys'))
     base = mgr.BaseContext(syscfg)
 
-    for key in ['uid', 'ip', 'q_int', 'q_ext', 'listen', 'publish']:
+    for key in ['uid', 'ip', 'q_int', 'q_ext', 'sub', 'pub']:
         assert key in base.config.data.keys(), f'missing {key}'
         assert base.config.get(key) is not None, f'missing value for {key}'
 
@@ -25,7 +25,16 @@ class MockMessage:
         self.payload = packet[1]
 
         self.decoded = json.loads(self.payload.decode('utf-8'))
-        self.dev_type, self.uid, self.command = self.topic.split('/')
+        topic = self.topic.split('/')
+
+        if len(topic) < 3:
+            raise Exception(f'missing topic fields in {topic}')
+
+        if topic[0] == 'ask':
+            self.topic = '/'.join(topic[:1])
+        else:
+            self.topic = topic[0]
+        self.uid, self.command = topic[-2:]
 
 
 @pytest.fixture
@@ -135,12 +144,11 @@ def test_event_context_send_config(event_setup, monkeypatch, default_config):
     _dict = {'new_value': 'newvalue'}
 
     with mgr.EventContext(syscfg) as context:
-        device_type = context.dev_type
         monkeypatch.setattr(context.q_ext, 'put', lambda x: in_queue.append(x))
         context.send_config(_dict)
         message = MockMessage(in_queue[-1])
 
-    assert message.dev_type == device_type, 'wrong device type'
+    assert message.topic == context.topic, 'wrong device type'
     assert message.uid == device.uid, 'wrong device UID'
     assert message.command == 'SUP', 'wrong command'
     assert message.decoded.get('timestamp') == 0, f'wrong device timestamp {message.decoded}'

@@ -40,8 +40,8 @@ class MQTTClient(Process):
 
         # Device
         self.skip_until = 0
-        self.publish = config.get('publish')
-        self.listen = config.get('listen')
+        self.pub = config.get('pub')
+        self.sub = config.get('sub')
 
         # MQTT broker
         self.broker_ip = config.get('broker_ip')
@@ -133,20 +133,20 @@ class MQTTClient(Process):
             On connect to broker
         """
 
-        #_codes = list(
-        #    "Connection successful",
-        #    ProtocolError("Connection refused – incorrect protocol version"),
-        #    ProtocolError("Connection refused – invalid client identifier"),
-        #    ConnectionRefusedError("Connection refused – server unavailable"),
-        #    AuthError("Connection refused – bad username or password"),
-        #    AuthError("Connection refused – not authorised")
-        #)
-        #print(rc)
-        #rc_codes = enumerate(_codes)
+        # _codes = list(
+        #     "Connection successful",
+        #     ProtocolError("Connection refused – incorrect protocol version"),
+        #     ProtocolError("Connection refused – invalid client identifier"),
+        #     ConnectionRefusedError("Connection refused – server unavailable"),
+        #     AuthError("Connection refused – bad username or password"),
+        #     AuthError("Connection refused – not authorised")
+        # )
+        # print(rc)
+        # rc_codes = enumerate(_codes)
 
-        #if rc != 0:
-        #    # connection failed
-        #    raise rc_codes.get(rc)
+        # if rc != 0:
+        #     # connection failed
+        #     raise rc_codes.get(rc)
 
         self.client.is_connected = True
         try:
@@ -156,17 +156,17 @@ class MQTTClient(Process):
         except Exception:
             self.subscr_stat = "[!] subscription failed"
 
-    def on_disconnect(self, client, userdata, flags, rc):
+    def on_disconnect(self, client, userdata, flas, rc):
         logging.debug('disconnected from broker')
         if rc != 0:
             logging.warning('that was unexpected. trying auto-reconnect in 1s...')
-            self.running = False
+            self.runnin = False
             time.sleep(1)
             self.run()
 
-    def on_message(self, client, userdata, msg):
+    def on_messae(self, client, userdata, msg):
         """
-            Message from MQTT broker received
+            Messae from MQTT broker received
         """
         print('[RECEIVE] {}:{}'.format(msg.topic, msg.payload))
         logging.debug('RECEIVE: {}:{}'.format(msg.topic, msg.payload))
