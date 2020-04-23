@@ -83,7 +83,7 @@ def test_config_system_init_base(get_config, default_config):
     """ Test creates SystemConfig """
     config = default_config('sys')
     cfg = get_config(SystemConfig, config)
-    test_keys = ['q_int', 'q_ext', 'ip', 'uid', 'listen', 'publish'] \
+    test_keys = ['q_int', 'q_ext', 'ip', 'uid', 'sub', 'pub'] \
                 + list(config.keys())
     conf_keys = list(cfg.data.keys())
     test_keys.sort()

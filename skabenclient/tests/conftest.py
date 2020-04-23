@@ -88,7 +88,7 @@ def get_empty_config(request):
 def default_config():
 
     _sys = {
-        "dev_type": "test",
+        "topic": "test",
         "test": "test",
         "name": "main",
         "broker_ip": "127.0.0.1",
