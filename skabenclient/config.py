@@ -2,7 +2,7 @@ import os
 import yaml
 import logging
 import multiprocessing as mp
-from skabenclient.helpers import get_mac, get_ip, FileLock
+from skabenclient.helpers import get_mac, get_ip, FileLock, make_logger
 from skabenclient.loaders import get_yaml_loader
 
 ExtendedLoader = get_yaml_loader()
@@ -103,37 +103,12 @@ class SystemConfig(Config):
             'sub': [topic, f"{topic}/{uid}"],
         })
 
-        # TODO: rename it to pub/sub
+    def logger(self, name='main', file_path='local.log', log_level=logging.DEBUG):
+        return loggers.get(name, make_logger(file_path, log_level))
 
     def write(self, data=None, mode=None):
         raise PermissionError('System config cannot be created automatically. '
                               'Seems like config file is missing or corrupted.')
-
-    def logger(self, file_path=None, log_level=None):
-        """ Make logger """
-        if not file_path:
-            file_path = 'local.log'
-        if not log_level:
-            log_level = logging.DEBUG
-
-        if loggers.get('main'):
-            logger = loggers.get('main')
-        else:
-            logging.basicConfig(filename=file_path, level=log_level)
-            logger = logging.getLogger('main')
-            FORMAT = '%(asctime)s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s'
-            log_format = logging.Formatter(FORMAT)
-            # set handlers
-            fh = logging.FileHandler(filename=file_path)
-            stream = logging.StreamHandler()
-            # assign
-            for handler in (fh, stream):
-                handler.setFormatter(log_format)
-                handler.setLevel(log_level)
-                logger.addHandler(handler)
-            logger.setLevel(log_level)
-            loggers.update({'main': logger})
-        return logger
 
 
 class DeviceConfig(Config):
