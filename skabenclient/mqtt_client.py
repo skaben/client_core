@@ -4,14 +4,11 @@ from multiprocessing import Process
 import paho.mqtt.client as mqtt
 from skabenclient.helpers import make_event
 
-import skabenproto as sk
-
-
-
 # TODO: [critical] manage connect status
 # TODO: [critical] report auth problems
 
 # some exceptions
+
 
 class MQTTError(Exception):
     """ base mqtt error class """
@@ -176,9 +173,7 @@ class MQTTClient(Process):
         logging.debug('RECEIVE: {}:{}'.format(msg.topic, msg.payload))
 
         try:
-            with sk.PacketDecoder() as decoder:
-                parsed = decoder.decode(msg)
-                event = make_event('mqtt', 'new', parsed)
-                self.q_int.put(event)
+            event = make_event('mqtt', 'new', msg)
+            self.q_int.put(event)
         except BaseException as e:
             logging.exception('exception occured: {}'.format(e))
