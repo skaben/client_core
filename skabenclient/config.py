@@ -104,7 +104,11 @@ class SystemConfig(Config):
         })
 
     def logger(self, name='main', file_path='local.log', log_level=logging.DEBUG):
-        return loggers.get(name, make_logger(file_path, log_level))
+        logger = loggers.get(name)
+        if not logger:
+            logger = make_logger(file_path, log_level)
+            loggers.update({name: logger})
+        return logger
 
     def write(self, data=None, mode=None):
         raise PermissionError('System config cannot be created automatically. '
