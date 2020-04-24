@@ -131,7 +131,7 @@ class MQTTClient(Process):
         finally:
             self.client.disconnect()
 
-    def on_connect(self, client, userdata, flags, rc):
+    def on_connect(self, client, userdata, flags):
         """
             On connect to broker
         """
@@ -159,7 +159,7 @@ class MQTTClient(Process):
         except Exception:
             self.subscr_stat = "[!] subscription failed"
 
-    def on_disconnect(self, client, userdata, flas, rc):
+    def on_disconnect(self, client, userdata, flags):
         logging.debug('disconnected from broker')
         if rc != 0:
             logging.warning('that was unexpected. trying auto-reconnect in 1s...')
