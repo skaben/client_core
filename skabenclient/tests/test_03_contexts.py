@@ -75,14 +75,14 @@ def test_event_context_update(event_setup, monkeypatch):
     assert test_conf.get('value') == 'newval'
 
 
-def test_event_context_send(event_setup, monkeypatch, default_config):
+def test_event_context_info_send(event_setup, monkeypatch, default_config):
     """ Test send command """
     syscfg = event_setup()
     _dict = {'new_value': 'new'}
-    event = make_event('device', 'send', _dict)
+    event = make_event('device', 'info', _dict)
 
     with mgr.EventContext(syscfg) as context:
-        monkeypatch.setattr(context, 'send_config', lambda x: x)
+        monkeypatch.setattr(context, 'config_send', lambda x: x)
         result = context.manage(event)
 
     test_conf = syscfg.get('device').config.load()
@@ -99,7 +99,7 @@ def test_event_context_input(event_setup, monkeypatch, default_config):
 
     with mgr.EventContext(syscfg) as context:
         # not sending config anywhere, just calling device.config.save
-        monkeypatch.setattr(context, 'send_config', lambda x: x)
+        monkeypatch.setattr(context, 'config_send', lambda x: x)
         result = context.manage(event)
 
     post_conf = {**default_config('dev'), **_dict}
@@ -125,7 +125,7 @@ def test_event_context_reload(event_setup, default_config):
 
 #todo: fix fix fix
 
-def test_event_context_send_config(event_setup, monkeypatch, default_config):
+def test_event_context_config_send(event_setup, monkeypatch, default_config):
     """ Test send config to server """
     in_queue = list()
     syscfg = event_setup()
@@ -133,7 +133,7 @@ def test_event_context_send_config(event_setup, monkeypatch, default_config):
 
     with mgr.EventContext(syscfg) as context:
         monkeypatch.setattr(context.q_ext, 'put', lambda x: in_queue.append(x))
-        context.send_config(_dict)
+        context.config_send(_dict)
         message = MockMessage(in_queue[-1])
 
     packet_topic = '/'.join((context.topic, syscfg.get('uid'), 'SUP'))
@@ -142,7 +142,7 @@ def test_event_context_send_config(event_setup, monkeypatch, default_config):
     assert message.decoded['datahold'].get('new_value') == _dict.get('new_value'), f'bad data send: {message.decoded}'
 
 
-def test_event_context_send_config_filtered(event_setup, monkeypatch, default_config):
+def test_event_context_config_send_filtered(event_setup, monkeypatch, default_config):
     """ Test send config to server """
     syscfg = event_setup()
     _dict = {'new_value': 'newvalue', 'filtered': True}
@@ -151,25 +151,25 @@ def test_event_context_send_config_filtered(event_setup, monkeypatch, default_co
         in_queue = list()
         context.filtered_keys.extend(['filtered'])
         monkeypatch.setattr(context.q_ext, 'put', lambda x: in_queue.append(x))
-        context.send_config(_dict)
+        context.config_send(_dict)
         message = MockMessage(in_queue[-1])
 
     assert message.decoded['datahold'].get('new_value') == 'newvalue', 'data not sent'
     assert message.decoded['datahold'].get('filtered') is not True, 'filtered data sent'
 
 
-def test_event_context_config_reply(event_setup, default_config, monkeypatch):
+def test_event_context_config_request(event_setup, default_config, monkeypatch):
     syscfg = event_setup()
     with mgr.EventContext(syscfg) as context:
         in_queue = list()
         monkeypatch.setattr(context.q_ext, 'put', lambda x: in_queue.append(x))
-        context.config_reply()
+        context.config_request()
         message = MockMessage(in_queue[-1])
 
     assert message.decoded['datahold'].get('request') == 'all'
 
 
-def test_event_context_config_reply_keys(event_setup, default_config, monkeypatch):
+def test_event_context_config_request_keys(event_setup, default_config, monkeypatch):
     dev_dict = {**default_config('dev'), **{'test_key': 'test_value', 'task_id': '12345'}}
     syscfg = event_setup(dev_config=dev_dict)
     _keys = ['test_key']
@@ -177,7 +177,7 @@ def test_event_context_config_reply_keys(event_setup, default_config, monkeypatc
     with mgr.EventContext(syscfg) as context:
         in_queue = list()
         monkeypatch.setattr(context.q_ext, 'put', lambda x: in_queue.append(x))
-        context.config_reply(keys=_keys)
+        context.config_request(keys=_keys)
         message = MockMessage(in_queue[-1])
         config_data = context.device.config.current()
 
