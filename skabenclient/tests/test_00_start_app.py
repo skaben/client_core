@@ -8,7 +8,7 @@ from skabenclient.helpers import make_event
 from skabenclient.mqtt_client import MQTTClient
 from skabenclient.device import BaseDevice
 from skabenclient.config import SystemConfig, DeviceConfig
-from skabenclient.contexts import MQTTContext, EventContext, Router
+from skabenclient.contexts import MQTTParseContext, EventContext, Router
 
 
 @pytest.fixture
@@ -118,7 +118,7 @@ def test_router_exit_by_event(get_router, request, get_from_queue):
 def test_router_event_mqtt(get_router, monkeypatch, get_from_queue):
     router, syscfg, devcfg = get_router
     test_queue = Queue()
-    monkeypatch.setattr(MQTTContext, 'manage', lambda x, y: test_queue.put(y))
+    monkeypatch.setattr(MQTTParseContext, 'manage', lambda x, y: test_queue.put(y))
     router.start()
 
     kinda_mqtt_parsed_message = {'payload': {'data': 'test'}, 'command': 'PING'}
