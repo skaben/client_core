@@ -9,11 +9,14 @@ import fcntl
 
 
 def get_mac(ifname):
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    info = fcntl.ioctl(s.fileno(),
-                       0x8927,
-                       struct.pack('256s', bytes(ifname, 'utf-8')[:15]))
-    return ''.join('%02x' % b for b in info[18:24])
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        info = fcntl.ioctl(s.fileno(),
+                           0x8927,
+                           struct.pack('256s', bytes(ifname, 'utf-8')[:15]))
+        return ''.join('%02x' % b for b in info[18:24])
+    except OSError as e:
+        raise OSError(f"wrong name for external network interface given\n\n{e}")
 
 
 def get_ip(ifname):
