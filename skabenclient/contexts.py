@@ -75,12 +75,6 @@ class MQTTParseContext(BaseContext):
             Command parsing and event routing
         """
         # todo: error handling
-        topic = event.topic.split('/')
-        command = topic[-1]
-
-        payload = json.loads(event.payload.decode('utf-8'))
-        timestamp = int(payload.get('timestamp'))
-        datahold = payload.get('datahold')
 
         if command == 'WAIT':
             # send me to the future
