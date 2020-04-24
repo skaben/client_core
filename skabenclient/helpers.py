@@ -61,31 +61,13 @@ class Event:
         self.data = data if data else None
 
     def __repr__(self):
-        return '[ EVENT: {} >> {} ]'.format(self.type, self.cmd)
-
-
-class MQTTEvent(Event):
-
-    """ External (MQTT) event """
-
-    def __init__(self, _type, cmd, data):
-        if not data:
-            logging.error(f'{self} no data in mqtt event')
-        super().__init__(_type, cmd, data)
-        payload = self.data.get('payload')
-        if not isinstance(payload, dict):
-            logging.error(f'get payload {type(payload)} instead of dict:\n{payload}')
-        self.payload = self.data.get('payload')
-        self.server_cmd = self.data.get('command')
+        return '[ EVENT of type {} with command {} ]'.format(self.type, self.cmd)
 
 
 def make_event(_type, cmd, data=None):
     """ event making interface """
     try:
-        if _type == 'mqtt':
-            event = MQTTEvent(_type, cmd, data)
-        else:
-            event = Event(_type, cmd, data)
+        event = Event(_type, cmd, data)
         return event
     except Exception:
         raise

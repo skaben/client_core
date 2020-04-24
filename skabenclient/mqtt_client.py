@@ -1,3 +1,4 @@
+import json
 import time
 import logging
 from multiprocessing import Process
@@ -6,6 +7,7 @@ from skabenclient.helpers import make_event
 
 # TODO: [critical] manage connect status
 # TODO: [critical] report auth problems
+# TODO: <Q
 
 # some exceptions
 
@@ -173,7 +175,16 @@ class MQTTClient(Process):
         logging.debug('RECEIVE: {}:{}'.format(msg.topic, msg.payload))
 
         try:
-            event = make_event('mqtt', 'new', msg)
+            topic = msg.topic.split('/')
+            payload = json.loads(msg.payload.decode('utf-8'))
+            data = dict(
+                    topic = topic,
+                    command = topic[-1],
+                    task_id = payload.get('task_id'),
+                    timestamp = int(payload.get('timestamp')),
+                    datahold = payload.get('datahold')
+            )
+            event = make_event('mqtt', 'new', data)
             self.q_int.put(event)
         except BaseException as e:
             logging.exception('exception occured: {}'.format(e))
