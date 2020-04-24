@@ -121,15 +121,15 @@ def test_router_event_mqtt(get_router, monkeypatch, get_from_queue):
     monkeypatch.setattr(MQTTParseContext, 'manage', lambda x, y: test_queue.put(y))
     router.start()
 
-    kinda_mqtt_parsed_message = {'payload': {'data': 'test'}, 'command': 'PING'}
+    kinda_mqtt_parsed_message = {'datahold': {'data': 'test'}, 'command': 'PING'}
     event = make_event('mqtt', 'test', kinda_mqtt_parsed_message)
     syscfg.get('q_int').put(event)
     result = list(get_from_queue(test_queue))
 
     assert result, 'event not managed'
     assert not len(result) > 1, 'too many events'
-    assert result[0].server_cmd == 'PING'
-    assert result[0].payload == {'data': 'test'}
+    assert result[0].data.get('command') == 'PING'
+    assert result[0].data.get('datahold') == {'data': 'test'}
 
 
 @pytest.mark.parametrize('event_data', ({'dict': 'data'}, None))
