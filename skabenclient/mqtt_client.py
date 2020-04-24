@@ -154,9 +154,9 @@ class MQTTClient(Process):
 
         self.client.is_connected = True
         try:
-            for c in self.listen:
+            for c in self.sub:
                 self.client.subscribe(c)
-            self.subscr_stat = "subscribed to " + ','.join(self.listen)
+            self.subscr_stat = "subscribed to " + ','.join(self.sub)
         except Exception:
             self.subscr_stat = "[!] subscription failed"
 
