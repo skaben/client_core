@@ -31,7 +31,7 @@ class BaseContext:
             raise Exception('external (to server) event queue not declared')
 
         # keepalive TS management
-        self.timestamp_fname = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ts')
+        self.timestamp_fname = os.path.join(self.config.root, 'timestamp')
         if not os.path.exists(self.timestamp_fname):
             with open(self.timestamp_fname, 'w') as fh:
                 fh.write('0')
