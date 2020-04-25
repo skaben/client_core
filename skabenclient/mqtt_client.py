@@ -5,30 +5,43 @@ from multiprocessing import Process
 import paho.mqtt.client as mqtt
 from skabenclient.helpers import make_event
 
-# TODO: [critical] manage connect status
-# TODO: [critical] report auth problems
-# TODO: <Q
-
-# some exceptions
-
 
 class MQTTError(Exception):
-    """ base mqtt error class """
-    pass
+    """Exception raised for errors in the mqtt
+
+    Attributes:
+        expression -- input expression in which the error occurred
+        message -- explanation of the error
+    """
+
+    def __init__(self, message):
+        self.message = message
 
 
-class AuthError(MQTTError):
-    pass
+class MQTTAuthError(MQTTError):
+    def __init__(self, message):
+        super().__init__(message)
 
 
-class ProtocolError(MQTTError):
-    pass
+class MQTTProtocolError(MQTTError):
+    def __init__(self, message):
+        super().__init__(message)
+
+
+auth_exc = {
+    "0": "Connection successful",
+    "1": MQTTProtocolError("Connection refused – incorrect protocol version"),
+    "2": MQTTProtocolError("Connection refused – invalid client identifier"),
+    "3": ConnectionRefusedError("Connection refused – server unavailable"),
+    "4": MQTTAuthError("Connection refused – bad username or password"),
+    "5": MQTTAuthError("Connection refused – not authorised")
+}
 
 
 class MQTTClient(Process):
 
     ch = dict()
-    subscr_stat = ''
+    subscriptions_info = ''
 
     def __init__(self, config):
         super().__init__()
@@ -56,42 +69,41 @@ class MQTTClient(Process):
             logging.error('[!] cannot configure client, broker ip missing. exiting...')
             return
 
-    def run(self):
+    def init_client(self):
         # MQTT client
-        self.client = mqtt.Client(clean_session=True)
+        client = mqtt.Client(clean_session=True)
         # authentication
-        self.client.username_pw_set(self.username, self.password)
+        client.username_pw_set(self.username, self.password)
         # define callbacks for MQTT (laaaame)
-        self.client.on_connect = self.on_connect
-        self.client.on_message = self.on_message
-        self.client.on_disconnect = self.on_disconnect
-        self.client.is_connected = False
-        logging.debug(':: connecting to MQTT broker at {}:{}...'
-                      .format(self.broker_ip, self.broker_port))
-        tries = 0
-        self.running = True
+        client.on_connect = self.on_connect
+        client.on_message = self.on_message
+        client.on_disconnect = self.on_disconnect
+        self.is_connected = False
+        return client
 
-        while not self.client.is_connected:
+    def connect_client(self):
+        exit_message = make_event('device', 'exit')
+        tries = 0
+        while not self.is_connected:
             if self.running is False:
                 return
-            self.client.loop()
+            self.client.loop()  # manual loop while not connected
             sleep_time = 2  # default sleep time
             tries += 1
-            print('connect try: {}, next try after {}s'.format(tries,
-                                                               sleep_time))
-            exit_message = make_event('device', 'exit')
+            print(f':: trying MQTT broker: {tries}, next try after {sleep_time}s')
             try:
-                self.client.connect(host=self.broker_ip, port=self.broker_port)
-                self.client.loop()
+                self.client.connect(host=self.broker_ip,
+                                    port=self.broker_port,
+                                    keepalive=60)
             except (ConnectionRefusedError, OSError):
                 sleep_time = 30
                 _errm = f'mqtt broker not available, waiting {sleep_time}s'
                 print(_errm)
                 logging.error(_errm)
-            except AuthError:
+            except MQTTAuthError:
                 logging.exception('auth error. system config should be fixed: ')
                 self.q_int.put(exit_message)
-            except ProtocolError:
+            except MQTTProtocolError:
                 logging.exception('protocol error. report immediately')
                 self.q_int.put(exit_message)
             except Exception:
@@ -99,16 +111,23 @@ class MQTTClient(Process):
                 self.q_int.put(exit_message)
             time.sleep(sleep_time)
 
-        self.client.loop_start()
         _connm = ':: connected to MQTT broker at ' \
                  '{broker_ip}:{broker_port} ' \
                  'as {client._client_id}'.format(**self.__dict__)
-        logging.debug(_connm)
-        print(_connm)
 
-        if not self.subscr_stat:
-            time.sleep(0.1)
-        logging.debug(self.subscr_stat)
+        logging.info(_connm)
+        print(_connm)
+        self.client.loop_start()
+
+    def run(self):
+        logging.debug(':: connecting to MQTT broker at {}:{}...'
+                      .format(self.broker_ip, self.broker_port))
+        self.running = True
+
+        self.client = self.init_client()
+        self.connect_client()
+        # all seems legit, running loop in separated thread
+
         try:
             logging.debug('MQTT module starting')
             while self.running:
@@ -119,6 +138,8 @@ class MQTTClient(Process):
                     if message[0] == 'exit':
                         logging.info('mqtt module stopping...')
                         self.running = False
+                    elif message[0] == 'reconnect':
+                        self.reconnect(message[1])
                     else:
                         logging.debug('[SENDING] {}'.format(message))
                         if isinstance(message, tuple):
@@ -129,60 +150,72 @@ class MQTTClient(Process):
         except Exception:
             logging.exception('catch error in mqtt module: ')
         finally:
-            self.client.disconnect()
+            self.client.disconnect(self.client, 0)
 
-    def on_connect(self, client, userdata, flags):
+    def reconnect(self, rc):
+        try:
+            logging.warning(f'unexpected disconnect (code {rc}).\ntrying auto-reconnect...')
+            self.is_connected = False
+            self.client.loop_stop()
+            time.sleep(1)
+            # don't want to mess with paho reconnection routines, just recreate the client
+            self.client = self.init_client()
+            result = self.connect_client()
+            logging.info(result)
+            # all seems legit, running loop in separated thread
+            self.client.loop_start()
+        except Exception:
+            raise
+
+    def on_connect(self, client, userdata, flags, rc):
         """
             On connect to broker
         """
 
-        # _codes = list(
-        #     "Connection successful",
-        #     ProtocolError("Connection refused – incorrect protocol version"),
-        #     ProtocolError("Connection refused – invalid client identifier"),
-        #     ConnectionRefusedError("Connection refused – server unavailable"),
-        #     AuthError("Connection refused – bad username or password"),
-        #     AuthError("Connection refused – not authorised")
-        # )
-        # print(rc)
-        # rc_codes = enumerate(_codes)
+        if 6 > rc > 0:
+            # connection failed
+            raise auth_exc.get(str(rc))
 
-        # if rc != 0:
-        #     # connection failed
-        #     raise rc_codes.get(rc)
+        self.is_connected = True
 
-        self.client.is_connected = True
         try:
             for c in self.sub:
                 self.client.subscribe(c)
-            self.subscr_stat = "subscribed to " + ','.join(self.sub)
+            self.subscriptions_info = "subscribed to " + ','.join(self.sub)
         except Exception:
-            self.subscr_stat = "[!] subscription failed"
+            raise
 
-    def on_disconnect(self, client, userdata, flags):
-        logging.debug('disconnected from broker')
+    def on_disconnect(self, client, userdata, rc):
+        logging.info('disconnected from broker')
+        rc = int(rc)
         if rc != 0:
-            logging.warning('that was unexpected. trying auto-reconnect in 1s...')
-            self.runnin = False
-            time.sleep(1)
-            self.run()
+            self.q_ext.put(('reconnect', rc))
+        else:
+            self.running = False
+            self.client.loop_stop(force=True)
 
     def on_message(self, client, userdata, msg):
         """
-            Messae from MQTT broker received
+            Message from MQTT broker received
+
+            receive message as (str, b'{}'), return dict
         """
         print('[RECEIVE] {}:{}'.format(msg.topic, msg.payload))
         logging.debug('RECEIVE: {}:{}'.format(msg.topic, msg.payload))
 
         try:
-            topic = msg.topic.split('/')
+            full_topic = msg.topic.split('/')
+            if 2 > len(full_topic) > 3:
+                raise Exception(f'unsupported topic format: {full_topic}')
             payload = json.loads(msg.payload.decode('utf-8'))
+
             data = dict(
-                    topic = topic,
-                    command = topic[-1],
-                    task_id = payload.get('task_id'),
-                    timestamp = int(payload.get('timestamp')),
-                    datahold = payload.get('datahold')
+                    topic=full_topic[0],
+                    uid=full_topic[1] if len(full_topic) == 3 else None,
+                    command=full_topic[-1],
+                    task_id=payload.get('task_id'),
+                    timestamp=int(payload.get('timestamp')),
+                    datahold=payload.get('datahold')
             )
             event = make_event('mqtt', 'new', data)
             self.q_int.put(event)

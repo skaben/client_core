@@ -129,5 +129,5 @@ def make_logger(file_path, log_level):
         handler.setFormatter(log_format)
         handler.setLevel(log_level)
         logger.addHandler(handler)
-    logger.setLevel(log_level)
+    logger.setLevel(logging.DEBUG)
     return logger

@@ -118,7 +118,7 @@ def test_router_exit_by_event(get_router, request, get_from_queue):
 def test_router_event_mqtt(get_router, monkeypatch, get_from_queue):
     router, syscfg, devcfg = get_router
     test_queue = Queue()
-    monkeypatch.setattr(MQTTParseContext, 'manage', lambda x, y: test_queue.put(y))
+    monkeypatch.setattr(EventContext, 'manage_mqtt', lambda x, y: test_queue.put(y))
     router.start()
 
     kinda_mqtt_parsed_message = {'datahold': {'data': 'test'}, 'command': 'PING'}
