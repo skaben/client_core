@@ -1,6 +1,5 @@
 import os
 import time
-import json
 import random
 import logging
 
@@ -60,6 +59,8 @@ class BaseContext:
     def __exit__(self, *err):
         return
 
+# TODO: merge it all with main event context (maybe)
+
 
 class MQTTParseContext(BaseContext):
     """ MQTT context manager
@@ -72,9 +73,12 @@ class MQTTParseContext(BaseContext):
 
     def manage(self, event):
         """ Manage event from MQTT
-            Command parsing and event routing
+            Event routing based on command
         """
-        # todo: error handling
+
+        command = event.data.get('command')
+        timestamp = event.data.get('timestamp')
+        datahold = event.data.get('datahold')
 
         if command == 'WAIT':
             # send me to the future
@@ -123,6 +127,7 @@ class EventContext(BaseContext):
         self.device = config.get('device')
         # for event context topic is always pub
         self.topic = self.config.get('pub')
+        self.uid = self.config.get('uid')
         if not self.device:
             raise Exception(f'{self} error: device not provided')
 
@@ -130,7 +135,7 @@ class EventContext(BaseContext):
         """ Managing events based on type """
         # receive update from server
 
-        if event.cmd == 'update':
+        if event.cmd in ('update', 'update_local_conf'):
             logging.debug('event is {} WITH DATA {}'.format(event, event.data))
             task_id = event.data.get('task_id', '12345')
             response = 'ACK'
@@ -143,23 +148,23 @@ class EventContext(BaseContext):
                 return self.confirm_update(task_id, response)
 
         # request config from server
-        elif event.cmd == 'cup':
+        elif event.cmd in ('cup', 'request_new_conf'):
             return self.config_request(event.data)
 
         # send current device config to server
-        elif event.cmd == 'sup':
+        elif event.cmd in ('sup', 'upload_current_conf'):
             conf = self.get_current_config()
             if event.data:
                 conf = [k for k in conf if k in event.data]
             return self.config_send(conf)
 
         # send data to server directly without local db update
-        elif event.cmd == 'info':
+        elif event.cmd in ('info', 'upload_custom_data'):
             logging.debug('event is {} - sending data to server'.format(event))
             return self.config_send(event.data)
 
         # input received, update local config, send to server
-        elif event.cmd == 'input':
+        elif event.cmd in ('input', 'user_input'):
             logging.debug('event is {} - input: {}'.format(event, event.data))
             if event.data:
                 self.device.config.save(event.data)
@@ -168,13 +173,55 @@ class EventContext(BaseContext):
                 logging.error('missing data from event: {}'.format(event))
 
         # reload device with current local config
-        elif event.cmd == 'reload':
+        elif event.cmd in ('reload', 'reset'):
             logging.debug('event is {} - reloading device'.format(event))
             return self.device.state_reload()
 
         # report bad event type
         else:
             logging.error('bad event {}'.format(event))
+
+    def manage_mqtt(self, event):
+        """ Manage event from MQTT based on command
+            Translate commands into internal event queue
+        """
+
+        command = event.data.get('command')
+        timestamp = event.data.get('timestamp')
+        datahold = event.data.get('datahold')
+
+        if command == 'WAIT':
+            # send me to the future
+            self.rewrite_ts(timestamp + datahold['timeout'])
+            return
+
+        if timestamp < self.timestamp:
+            # ignoring messages from the past
+            if command not in ('CUP', 'SUP'):
+                return
+
+        # update local ts from event
+        self.rewrite_timestamp(timestamp)
+
+        try:
+            if command == 'PING':
+                # reply with pong immediately
+                packet = sp.PONG(topic=self.topic,
+                                 uid=self.uid,
+                                 timestamp=self.timestamp)
+                self.q_ext.put(packet.encode())
+            elif command == 'CUP':
+                # pass to internal event context
+                event = make_event('device', 'update', datahold.get('fields'))
+                self.q_int.put(event)
+            elif command == 'SUP':
+                # pass to internal event context
+                event = make_event('device', 'sup', datahold.get('fields'))
+                self.q_int.put(event)
+            else:
+                raise Exception(f"unrecognized command: {command}")
+        except Exception:
+            raise
 
     def config_send(self, data=None):
         """ Send config to server """
@@ -186,8 +233,8 @@ class EventContext(BaseContext):
             return
         data = {k: v for k, v in data.items() if k not in self.filtered_keys}
         # send update to server
-        packet = sp.SUP(topic=self.config.get('pub'),
-                        uid=self.config.get('uid'),
+        packet = sp.SUP(topic=self.topic,
+                        uid=self.uid,
                         task_id=self.task_id,
                         timestamp=self.timestamp,
                         datahold=data)
@@ -201,8 +248,8 @@ class EventContext(BaseContext):
         else:
             datahold = {'request': 'all'}  # full conf
 
-        packet = sp.CUP(topic=self.config.get('pub'),
-                        uid=self.config.get('uid'),
+        packet = sp.CUP(topic=self.topic,
+                        uid=self.uid,
                         timestamp=self.timestamp,
                         task_id=self.task_id,
                         datahold=datahold)
@@ -264,8 +311,8 @@ class Router(Thread):
                 # packets with label 'mqtt' comes from server
                 if event.type == 'mqtt':
                     # decode and parse it with MQTTParseContext
-                    with MQTTParseContext(self.config) as mqtt:
-                        mqtt.manage(event)
+                    with EventContext(self.config) as context:
+                        context.manage_mqtt(event)
 
                 # packets with label 'device' comes from self, client
                 elif event.type == 'device':

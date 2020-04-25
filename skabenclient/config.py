@@ -87,11 +87,17 @@ class SystemConfig(Config):
         super().__init__(config_path)
 
         iface = self.data.get('iface')
-        topic = self.data.get('topic')
-        uid = get_mac(iface)
 
         if not iface:
             raise Exception('network interface missing in config')
+
+        topic = self.data.get('topic')
+        uid = get_mac(iface)
+
+        # set PUB/SUB topics
+        _publish = f'ask/{topic}'
+        # 'all' reserved for broadcast messages
+        _subscribe = [f"{topic}/all/#", f"{topic}/{uid}/#"]
 
         # update config with session values, this will not be saved to file
         self.update({
@@ -99,8 +105,8 @@ class SystemConfig(Config):
             'ip': get_ip(iface),
             'q_int': mp.Queue(),
             'q_ext': mp.Queue(),
-            'pub': f'ask/{topic}',
-            'sub': [topic, f"{topic}/{uid}"],
+            'pub': _publish,
+            'sub': _subscribe,
         })
 
     def logger(self, name='main', file_path='local.log', log_level=logging.DEBUG):

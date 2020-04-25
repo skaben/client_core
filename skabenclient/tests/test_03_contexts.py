@@ -1,13 +1,13 @@
 import pytest
 import json
 
-import skabenproto as sk
 import skabenclient.contexts as mgr
 
 from skabenclient.config import SystemConfig, DeviceConfig
 from skabenclient.device import BaseDevice
 from skabenclient.helpers import make_event
 
+from skabenclient.tests.mock.comms import MockMessage
 
 def test_base_context(get_config, default_config):
     syscfg = get_config(SystemConfig, default_config('sys'))
@@ -16,14 +16,6 @@ def test_base_context(get_config, default_config):
     for key in ['uid', 'ip', 'q_int', 'q_ext', 'sub', 'pub']:
         assert key in base.config.data.keys(), f'missing {key}'
         assert base.config.get(key) is not None, f'missing value for {key}'
-
-
-class MockMessage:
-
-    def __init__(self, packet):
-        self.topic = packet[0]
-        self.payload = packet[1]
-        self.decoded = json.loads(self.payload.decode('utf-8'))
 
 
 @pytest.fixture
@@ -46,7 +38,7 @@ def event_setup(get_config, default_config):
     return _wrap
 
 
-def test_event_extended_dict(event_setup, default_config, monkeypatch):
+def test_event_extended_dict(event_setup, default_config):
     dev_dict = {**default_config('dev'), **{'test_key': "test_val"}}
     syscfg = event_setup(dev_config=dev_dict)
 
@@ -123,7 +115,6 @@ def test_event_context_reload(event_setup, default_config):
     assert changed.get('value') == 'updated', 'config not updated on the fly'
     assert result == pre_conf, 'config was not reloaded'
 
-#todo: fix fix fix
 
 def test_event_context_config_send(event_setup, monkeypatch, default_config):
     """ Test send config to server """
