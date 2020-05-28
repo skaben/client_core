@@ -65,6 +65,7 @@ class MQTTClient(Process):
         self.broker_port = config.get('broker_port', 1883)
         self.username = config.get('username')
         self.password = config.get('password')
+        self.client_id = f"{config.get('topic')}_{config.get('uid')}"
 
         if not self.broker_ip:
             logging.error('[!] cannot configure client, broker ip missing. exiting...')
@@ -79,6 +80,7 @@ class MQTTClient(Process):
         client.on_connect = self.on_connect
         client.on_message = self.on_message
         client.on_disconnect = self.on_disconnect
+        client._client_id = self.client_id
         self.is_connected = False
         return client
 
