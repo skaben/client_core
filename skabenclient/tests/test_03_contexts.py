@@ -31,7 +31,7 @@ def event_setup(get_config, default_config):
         devcfg.save()
 
         syscfg = get_config(SystemConfig, sys_config, fname='system_conf.yml')
-        device = BaseDevice(syscfg, devcfg.config_path)
+        device = BaseDevice(syscfg, devcfg)
         syscfg.set('device', device)
         return syscfg
 
