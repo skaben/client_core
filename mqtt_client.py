@@ -28,7 +28,6 @@ class MQTTProtocolError(MQTTError):
         super().__init__(message)
 
 
-# NB: not working at all
 auth_exc = {
     "0": "Connection successful",
     "1": MQTTProtocolError("Connection refused – incorrect protocol version"),
