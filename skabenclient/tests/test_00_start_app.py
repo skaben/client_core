@@ -21,7 +21,7 @@ def get_router(get_config, default_config):
     # write system config with device config file location
     syscfg = get_config(SystemConfig, default_config('sys'), fname='sys_cfg.yml')
     # create device from system config
-    device = BaseDevice(syscfg, devcfg.config_path)
+    device = BaseDevice(syscfg, devcfg)
     # assign device instance to config singleton
     syscfg.update({'device': device})
     router = Router(syscfg)
@@ -62,7 +62,7 @@ def test_start_app_routine(get_config, default_config, get_from_queue, monkeypat
     # write system config with device config file location
     syscfg = get_config(SystemConfig, default_config('sys'))
     # create device from system config
-    device = BaseDevice(syscfg, devcfg.config_path)
+    device = BaseDevice(syscfg, devcfg)
     syscfg.update({'device': device})
 
     test_queue = Queue()

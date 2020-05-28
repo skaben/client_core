@@ -17,7 +17,7 @@ fi
 mkdir dist
 
 . ./venv/bin/activate
-python setup.py build sdist bdist_wheel
+python setup.py build sdist
 
 # pushing to repo
 version=$(cat ./setup.py |grep version |cut -f2 -d "'")
