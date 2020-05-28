@@ -13,7 +13,7 @@ def get_device(get_config, default_config, monkeypatch):
     devcfg.save()
 
     syscfg = get_config(SystemConfig, default_config('sys'))
-    device = BaseDevice(syscfg, devcfg.config_path)
+    device = BaseDevice(syscfg, devcfg)
     monkeypatch.setattr(device, 'logger', MockLogger)
 
     return device, devcfg, syscfg
