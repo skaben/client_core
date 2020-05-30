@@ -98,13 +98,18 @@ class MQTTClient(Process):
                 self.client.connect(host=self.broker_ip,
                                     port=self.broker_port,
                                     keepalive=60)
+            except ValueError:
+                _errm = f"check system config, client misconfigured.\n"\
+                        f"broker_ip: {self.broker_ip} broker_port: {self.broker_port}"
+                self.client.loop_stop()
+                self.q_int.put(exit_message)
             except (ConnectionRefusedError, OSError):
                 sleep_time = 30
                 _errm = f'mqtt broker not available, waiting {sleep_time}s'
                 print(_errm)
                 logging.error(_errm)
             except MQTTAuthError:
-                logging.exception('auth error. system config should be fixed: ')
+                logging.exception('auth error. check system config ')
                 self.q_int.put(exit_message)
             except MQTTProtocolError:
                 logging.exception('protocol error. report immediately')
