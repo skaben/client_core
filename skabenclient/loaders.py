@@ -39,13 +39,16 @@ class SoundLoader:
             mixer.init()
             time.sleep(.2)
             self.enabled = True
-        except Exception:
-            raise
+        except Exception as e:
+            raise Exception(f"failed to initialize pygame sound mixer:\n{e}")
 
-        for r, d, f in os.walk(sound_dir):
-            for filename in f:
-                fpath = os.path.join(r, filename)
-                self.sound[filename.split('.')[0]] = self._snd(fpath)
+        try:
+            for r, d, f in os.walk(sound_dir):
+                for filename in f:
+                    fpath = os.path.join(r, filename)
+                    self.sound[filename.split('.')[0]] = self._snd(fpath)
+        except TypeError as e:
+            raise Exception(f"check sound dir path:\n{e}")
 
         # TODO: check for maximum number of channels available
         for idx, ch in enumerate(channel_list, 1):
