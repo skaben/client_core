@@ -19,9 +19,12 @@ def start_app(app_config, device):
         mqttc.start()
         router.start()
         app_config.get('device').run()
+        print(f'running application with config:\n {app_config}')
+    except KeyboardInterrupt:
+        print('catched keyboard interrupt')
+        raise SystemExit('exiting')
     except Exception:
         raise
     finally:
         router.join(.5)
         mqttc.join(.5)
-        print(f'running application with config:\n {app_config}')
