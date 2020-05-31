@@ -134,9 +134,9 @@ class EventContext(BaseContext):
     def manage(self, event):
         """ Managing events based on type """
         # receive update from server
+        logging.debug('event is {} WITH DATA {}'.format(event, event.data))
 
         if event.cmd in ('update', 'update_local_conf'):
-            logging.debug('event is {} WITH DATA {}'.format(event, event.data))
             task_id = event.data.get('task_id', '12345')
             response = 'ACK'
             try:
@@ -212,7 +212,7 @@ class EventContext(BaseContext):
                 self.q_ext.put(packet.encode())
             elif command == 'CUP':
                 # pass to internal event context
-                event = make_event('device', 'update', datahold.get('fields'))
+                event = make_event('device', 'update', datahold)
                 self.q_int.put(event)
             elif command == 'SUP':
                 # pass to internal event context
