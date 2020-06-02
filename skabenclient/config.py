@@ -5,8 +5,8 @@ import multiprocessing as mp
 from skabenclient.helpers import get_mac, get_ip, FileLock, make_logger
 from skabenclient.loaders import get_yaml_loader
 
-ExtendedLoader = get_yaml_loader()
 loggers = {}
+ExtendedLoader = get_yaml_loader()
 
 
 class Config:
@@ -27,17 +27,21 @@ class Config:
         current = self.read()
         self.update(current)
 
+    def _yaml_load(self, source):
+        """ Loads yaml with correct Loader """
+        result = yaml.load(source, Loader=ExtendedLoader)
+        if not result:
+            raise EOFError(f"{source} cannot be loaded")
+        return result
+
     def read(self):
         """ Reads from config file """
         try:
             with FileLock(self.config_path):
                 with open(self.config_path, 'r') as fh:
-                    res = yaml.load(fh, Loader=ExtendedLoader)
-                    if not res:
-                        raise EOFError
+                    return self._yaml_load(fh)
         except Exception:
             raise
-        return res
 
     def write(self, data=None, mode='w'):
         """ Writes to config file """
@@ -47,7 +51,8 @@ class Config:
             data = self._filter(data)
             with FileLock(self.config_path):
                 with open(self.config_path, mode) as fh:
-                    fh.write(yaml.dump(self._filter(data)))
+                    dump = yaml.dump(self._filter(data), default_flow_style=False)
+                    fh.write(dump)
         except Exception:
             raise
 

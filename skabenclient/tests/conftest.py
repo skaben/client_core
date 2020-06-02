@@ -1,6 +1,7 @@
 import os
 import yaml
 import pytest
+import hashlib
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -81,8 +82,6 @@ def get_empty_config(request):
 
     return _wrap
 
-#TODO: config collection
-
 
 @pytest.fixture(scope="module")
 def default_config():
@@ -108,5 +107,18 @@ def default_config():
 
     def _wrap(conf_type):
         return switch.get(conf_type)
+
+    return _wrap
+
+
+@pytest.fixture(scope="module")
+def get_hash():
+
+    def _wrap(data):
+        encoded = data.encode('utf-8')
+        hash = hashlib.md5()
+        hash.update(encoded)
+        hash = hash.hexdigest()
+        return hash
 
     return _wrap

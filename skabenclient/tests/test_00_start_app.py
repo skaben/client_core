@@ -43,7 +43,7 @@ def get_from_queue():
 
     return _wrap
 
-
+"""
 def test_router_init(get_router):
     router, syscfg, devcfg = get_router
     for attr in ('q_int', 'q_ext'):
@@ -52,7 +52,7 @@ def test_router_init(get_router):
         assert getattr(router, attr) == syscfg.data[attr], f"wrong value for {attr}"
 
     assert router.logger, "logger was not created"
-
+"""
 
 def test_start_app_routine(get_config, default_config, get_from_queue, monkeypatch):
     """ Test all client components was initialized and can be start successfully """
