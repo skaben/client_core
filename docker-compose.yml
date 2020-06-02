@@ -7,9 +7,6 @@ services:
     volumes:
       - .:/app
     command: >
-       sh -c "flake8 /app/skabenclient && \
-              /app/deploy_to_repo.sh"
+       sh -c "pytest /app/skabenclient && \
+              flake8 /app/skabenclient"
     env_file: '.env'
-
-
-#pytest /app/skabenclient && \
