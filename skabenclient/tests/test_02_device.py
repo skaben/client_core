@@ -1,6 +1,7 @@
 import pytest
 
 from skabenclient.tests.mock.logger import MockLogger
+from skabenclient.tests.mock.data import base_config, yaml_content_as_dict
 
 from skabenclient.device import BaseDevice
 from skabenclient.helpers import make_event
@@ -27,27 +28,30 @@ def test_device_init(get_device):
     assert device.config.config_path == devcfg.config_path, 'wrong config path'
     assert device.config.data == devcfg.data
 
+test_complex_dict = {"complex": yaml_content_as_dict}
 
-def test_device_input_new(get_device, default_config):
+@pytest.mark.parametrize("payload", (base_config, yaml_content_as_dict, test_complex_dict))
+def test_device_input_new(get_device, default_config, payload):
     device, devcfg, syscfg = get_device
-    new_input = {'input': 'new_input'}
 
-    event = device.state_update({**default_config('dev'), **new_input})
-    test_event = make_event('device', 'input',
-                            {**new_input, **{'uid': syscfg.get('uid')}})  # add uid
-    #device.config.save()
-    #assert device.config.data == {**devcfg.data, **new_input}, 'user input not saved'
+    event = device.state_update({**default_config('dev'), **payload})
+    payload_and_uid = {**payload, **{'uid': syscfg.get('uid')}}
+    test_event = make_event('device', 'input', payload_and_uid)
+    device.config.save(payload)
+
+    assert device.config.data == {**devcfg.data, **payload}, 'user input not saved'
     assert event.type == test_event.type, 'bad event type'
     assert event.cmd == test_event.cmd, 'bad event command'
     assert event.data == test_event.data, 'bad event data'
 
 
-def test_device_input_exist(get_device, default_config):
+@pytest.mark.parametrize("payload", (base_config, yaml_content_as_dict))
+def test_device_input_exist(get_device, default_config, payload):
     device, devcfg, syscfg = get_device
-    new_input = default_config('dev')
-    event = device.state_update(new_input)
-#    device.config.save()
-#    assert device.config.data == {**devcfg.data, **new_input}, 'user input not saved'
+    device.config.data = payload
+    event = device.state_update(payload)
+    device.config.save(payload)
+    assert device.config.data == {**devcfg.data, **payload}, 'user input not saved'
     assert event is None, "event created when should not"
 
 
