@@ -184,7 +184,7 @@ class DeviceConfig(Config):
         """ Apply and save persistent state """
         if payload:
             self.update(payload)
-        return self.write()
+        return self.write(payload)
 
     def current(self):
         """ Get current config """
