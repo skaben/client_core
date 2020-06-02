@@ -8,6 +8,8 @@ from skabenclient.device import BaseDevice
 from skabenclient.helpers import make_event
 
 from skabenclient.tests.mock.comms import MockMessage
+from skabenclient.tests.mock.data import yaml_content_as_dict, base_config
+
 
 def test_base_context(get_config, default_config):
     syscfg = get_config(SystemConfig, default_config('sys'))
@@ -59,7 +61,7 @@ def test_event_context_update(event_setup, monkeypatch):
         result = context.manage(event)
 
     devconf = syscfg.get('device').config
-    # devconf.reset()  # clean up config namespace
+    devconf.data = {}  # clean up config
     test_conf = devconf.load()  # reread from file
 
     assert result.get('response') == 'ACK'
@@ -83,20 +85,20 @@ def test_event_context_info_send(event_setup, monkeypatch, default_config):
     assert result == _dict, 'bad data sent'
 
 
-def test_event_context_input(event_setup, monkeypatch, default_config):
+@pytest.mark.parametrize("payload", (yaml_content_as_dict, base_config))
+def test_event_context_input(event_setup, monkeypatch, default_config, payload):
     """ Test input command """
     syscfg = event_setup()
-    _dict = {'new_value': 'new'}
-    event = make_event('device', 'input', _dict)
+    event = make_event('device', 'input', payload)
 
     with mgr.EventContext(syscfg) as context:
         # not sending config anywhere, just calling device.config.save
         monkeypatch.setattr(context, 'config_send', lambda x: x)
         result = context.manage(event)
 
-    post_conf = {**default_config('dev'), **_dict}
+    post_conf = {**default_config('dev'), **payload}
 
-    assert result == _dict, 'config not sent'
+    assert result == payload, 'config not sent'
     assert syscfg.get('device').config.load() == post_conf, 'config not saved'
 
 
