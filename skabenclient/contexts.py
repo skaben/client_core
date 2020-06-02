@@ -165,7 +165,7 @@ class EventContext(BaseContext):
 
         # input received, update local config, send to server
         elif event.cmd in ('input', 'user_input'):
-            logging.debug('event is {} - input: {}'.format(event, event.data))
+            logging.debug('input event is {} - input: {}'.format(event, event.data))
             if event.data:
                 self.device.config.save(event.data)
                 return self.config_send(event.data)
