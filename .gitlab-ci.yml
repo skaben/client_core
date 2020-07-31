@@ -1,17 +1,15 @@
-image: python:3.8-alpine3.11
+image: python:3.8-slim-buster
 
 stages:
   - build
   - test
-  - deploy
 
 build:
   stage: build
-  script: python3 -m pip install --upgrade pip && \ 
-          python3 -m pip install -r ./build_requirements.txt && \
-          apk add iproute2 curl
+  script: python -m pip install -r ./build_requirements.txt && \
+          apt-get install -y --no-install-recommends libglib2.0-0 iproute2 curl
 
 test:
   stage: test
-  script: python3 -m pytest ./skabenclient && \
-          python3 -m flake8 ./skabenclient
+  script: python -m pytest ./skabenclient && \
+          python -m flake8 ./skabenclient
