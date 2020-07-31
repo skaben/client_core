@@ -15,9 +15,12 @@ build:
 
 deploy:
   stage: deploy
+  image: python:3.7-slim-buster
   variables:
     TOKEN: $GEMFURY_PUSH_TOKEN
   script:
+    - python -m pip install --upgrade pip
+    - python -m pip install setuptools wheel
     - echo "Deploy to gemfury.io PyPi"
     - ./deploy_to_repo.sh
   when: manual
