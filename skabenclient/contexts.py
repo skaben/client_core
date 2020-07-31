@@ -8,7 +8,8 @@ from threading import Thread
 from skabenproto import packets as sp
 from skabenclient.helpers import make_event
 
-# TODO: refactor it.
+
+# TODO: refactoring
 
 
 class BaseContext:
@@ -59,63 +60,6 @@ class BaseContext:
     def __exit__(self, *err):
         return
 
-# TODO: merge it all with main event context (maybe)
-
-
-class MQTTParseContext(BaseContext):
-    """ MQTT context manager
-
-        parsing mqtt messages, send responses, pass events to device handlers
-    """
-
-    def __init__(self, config):
-        super().__init__(config)
-
-    def manage(self, event):
-        """ Manage event from MQTT
-            Event routing based on command
-        """
-
-        command = event.data.get('command')
-        timestamp = event.data.get('timestamp')
-        datahold = event.data.get('datahold')
-
-        if command == 'WAIT':
-            # send me to the future
-            self.rewrite_ts(timestamp + datahold['timeout'])
-            return
-
-        if timestamp < self.timestamp:
-            # ignoring messages from the past
-            if command not in ('CUP', 'SUP'):
-                return
-
-        # update local ts from event
-        self.rewrite_timestamp(timestamp)
-
-        try:
-            if command == 'PING':
-                # reply with pong immediately
-                packet = sp.PONG(topic=self.config['pub'],
-                                 uid=self.uid,
-                                 timestamp=self.timestamp)
-                self.q_ext.put(packet.encode())
-            elif command == 'CUP':
-                # pass to internal event context
-                event = make_event('device', 'update', datahold.get('fields'))
-                self.q_int.put(event)
-            elif command == 'SUP':
-                # pass to internal event context
-                event = make_event('device', 'sup', datahold.get('fields'))
-                self.q_int.put(event)
-            else:
-                raise Exception(f"unrecognized command: {command}")
-        except Exception:
-            raise
-
-    def __repr__(self):
-        return '<PacketManager>'
-
 
 class EventContext(BaseContext):
 
@@ -131,12 +75,20 @@ class EventContext(BaseContext):
         if not self.device:
             raise Exception(f'{self} error: device not provided')
 
+    def get_current_config(self):
+        """ load current device config """
+        current = self.device.config.data
+        if not current:
+            current = self.device.config.load()
+        return current
+
     def manage(self, event):
         """ Managing events based on type """
         # receive update from server
         logging.debug('event is {} WITH DATA {}'.format(event, event.data))
+        command = event.cmd.lower()
 
-        if event.cmd in ('update', 'update_local_conf'):
+        if command == 'update':
             task_id = event.data.get('task_id', '12345')
             response = 'ACK'
             try:
@@ -148,23 +100,26 @@ class EventContext(BaseContext):
                 return self.confirm_update(task_id, response)
 
         # request config from server
-        elif event.cmd in ('cup', 'request_new_conf'):
+        elif command == 'cup':
             return self.config_request(event.data)
 
         # send current device config to server
-        elif event.cmd in ('sup', 'upload_current_conf'):
+        elif command == 'sup':
             conf = self.get_current_config()
+            # send only required fields
             if event.data:
-                conf = [k for k in conf if k in event.data]
+                filtered = {k:v for k,v in conf.items() if k in event.data}
+                if filtered:
+                    conf = filtered
             return self.config_send(conf)
 
         # send data to server directly without local db update
-        elif event.cmd in ('info', 'upload_custom_data'):
+        elif command == 'info':
             logging.debug('event is {} - sending data to server'.format(event))
             return self.config_send(event.data)
 
         # input received, update local config, send to server
-        elif event.cmd in ('input', 'user_input'):
+        elif command == 'input':
             logging.debug('input event is {} - input: {}'.format(event, event.data))
             if event.data:
                 self.device.config.save(event.data)
@@ -173,7 +128,7 @@ class EventContext(BaseContext):
                 logging.error('missing data from event: {}'.format(event))
 
         # reload device with current local config
-        elif event.cmd in ('reload', 'reset'):
+        elif command in ('reload', 'reset'):
             logging.debug('event is {} - reloading device'.format(event))
             return self.device.state_reload()
 
@@ -225,20 +180,22 @@ class EventContext(BaseContext):
 
     def config_send(self, data=None):
         """ Send config to server """
-        if not data:
-            logging.error('missing data')
-            return
-        if not isinstance(data, dict):
-            logging.error(f'data is not a dict: {data}')
-            return
-        data = {k: v for k, v in data.items() if k not in self.filtered_keys}
-        # send update to server
-        packet = sp.SUP(topic=self.topic,
-                        uid=self.uid,
-                        task_id=self.task_id,
-                        timestamp=self.timestamp,
-                        datahold=data)
-        self.q_ext.put(packet.encode())
+        try:
+            if not data:
+                raise Exception("empty data")
+            if not isinstance(data, dict):
+                raise Exception(f'data is not a dict: {data}')
+
+            data = {k: v for k, v in data.items() if k not in self.filtered_keys}
+            # send update to server
+            packet = sp.SUP(topic=self.topic,
+                            uid=self.uid,
+                            task_id=self.task_id,
+                            timestamp=self.timestamp,
+                            datahold=data)
+            self.q_ext.put(packet.encode())
+        except Exception as e:
+            logging.exception(f"error in context config send - {e} \n {self}")
 
     def config_request(self, keys=None):
         """ Request config from server """
@@ -268,13 +225,6 @@ class EventContext(BaseContext):
                               uid=self.config.get('uid'),
                               task_id=task_id)
         self.q_ext.put(packet.encode())
-
-    def get_current_config(self):
-        """ load current device config """
-        current = self.device.config.data
-        if not current:
-            current = self.device.config.load()
-        return current
 
 
 class Router(Thread):
