@@ -217,14 +217,12 @@ class MQTTClient(Process):
                 raise Exception(f'unsupported topic format: {full_topic}')
             payload = json.loads(msg.payload.decode('utf-8'))
 
-            data = dict(
-                    topic=full_topic[0],
-                    uid=full_topic[1] if len(full_topic) == 3 else None,
-                    command=full_topic[-1],
-                    task_id=payload.get('task_id'),
-                    timestamp=int(payload.get('timestamp')),
-                    datahold=payload.get('datahold')
-            )
+            data = dict(topic=full_topic[0],
+                        uid=full_topic[1] if len(full_topic) == 3 else None,
+                        command=full_topic[-1],
+                        task_id=payload.get('task_id'),
+                        timestamp=int(payload.get('timestamp')),
+                        datahold=payload.get('datahold'))
             event = make_event('mqtt', 'new', data)
             self.q_int.put(event)
         except BaseException as e:

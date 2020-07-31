@@ -72,8 +72,7 @@ class Config:
     def _filter(self, payload):
         """ Filter keys starting with underscore and by filtered keys list """
         cfg = {k: v for k, v in payload.items()
-               if not k.startswith('_')
-               and k not in self.not_stored_keys}
+               if not k.startswith('_') and k not in self.not_stored_keys}
         return cfg
 
 
