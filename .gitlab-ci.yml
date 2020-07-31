@@ -1,5 +1,6 @@
 stages:
   - test
+  - deploy
 
 build:
   stage: test
@@ -11,3 +12,14 @@ build:
     - python -m pip install -r ./build_requirements.txt
     - python -m pytest ./skabenclient
     - python -m flake8 ./skabenclient
+
+deploy:
+  stage: deploy
+  variables:
+    TOKEN: $GEMFURY_PUSH_TOKEN
+  script:
+    - echo "Deploy to gemfury.io PyPi"
+    - ./deploy_to_repo.sh
+  when: manual
+  only:
+    - master
