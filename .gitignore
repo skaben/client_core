@@ -2,6 +2,7 @@
 skabenclient/tests/res/*.yml
 timestamp
 ts
+*.swp
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
