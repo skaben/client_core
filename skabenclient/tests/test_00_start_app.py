@@ -8,7 +8,7 @@ from skabenclient.helpers import make_event
 from skabenclient.mqtt_client import MQTTClient
 from skabenclient.device import BaseDevice
 from skabenclient.config import SystemConfig, DeviceConfig
-from skabenclient.contexts import MQTTParseContext, EventContext, Router
+from skabenclient.contexts import EventContext, Router
 
 
 @pytest.fixture
