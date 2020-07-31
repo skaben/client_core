@@ -1,15 +1,17 @@
+image: python3.8:alpine3.11
+
+stages:
+  - build
+  - test
+  - deploy
+
 build:
-  stage: build 
-  image: 
-    name: docker/compose:1.21.2
-    entrypoint: ["/bin/sh", "-c"]
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-  services:
-    - docker:dind
-  script:
-    - docker version # verify docker cli is there. Also prints server info 
-    - docker-compose version # verify the docker-compose cli is there
-    - docker-compose up -d --build # building containers
-#    - docker-compose run skaben sh -c "pytest && flake8"
-    - docker-compose down
+  stage: build
+  script: python -m pip install --upgrade pip && \ 
+          python -m pip install -r ./build_requirements.txt && \
+          apt-get install -y --no-install-recommends libglib2.0-0 iproute2 curl
+
+test:
+  stage: test
+  script: python -m pytest ./skabenclient && \
+          python -m flake8 ./skabenclient
