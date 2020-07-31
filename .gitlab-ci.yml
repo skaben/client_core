@@ -7,11 +7,11 @@ stages:
 
 build:
   stage: build
-  script: python -m pip install --upgrade pip && \ 
-          python -m pip install -r ./build_requirements.txt && \
+  script: python3 -m pip install --upgrade pip && \ 
+          python3 -m pip install -r ./build_requirements.txt && \
           apk add iproute2 curl
 
 test:
   stage: test
-  script: python -m pytest ./skabenclient && \
-          python -m flake8 ./skabenclient
+  script: python3 -m pytest ./skabenclient && \
+          python3 -m flake8 ./skabenclient
