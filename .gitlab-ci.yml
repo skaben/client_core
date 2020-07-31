@@ -2,7 +2,7 @@ stages:
   - test
   - deploy
 
-build:
+test:
   stage: test
   image: python:3.7-slim-buster
   script:
