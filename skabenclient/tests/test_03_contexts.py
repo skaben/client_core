@@ -1,4 +1,5 @@
 import pytest
+import time
 import json
 
 import skabenclient.contexts as mgr
@@ -149,6 +150,30 @@ def test_event_context_config_send_filtered(event_setup, monkeypatch, default_co
 
     assert message.decoded['datahold'].get('new_value') == 'newvalue', 'data not sent'
     assert message.decoded['datahold'].get('filtered') is not True, 'filtered data sent'
+
+
+@pytest.mark.parametrize("key, expected", [
+    ("bool", base_config.get("bool")),
+    ("not_presented", None)
+])
+def test_event_context_config_send_from_event_with_data(event_setup, monkeypatch, default_config, key, expected):
+    """ Test send config to server with filtered fields """
+    in_queue = list()
+    syscfg = event_setup(dev_config=base_config)
+    internal_event = make_event("device", "sup", [key,])
+
+    with mgr.EventContext(syscfg) as context:
+        monkeypatch.setattr(context.q_ext, 'put', lambda x: in_queue.append(x))
+        context.manage(internal_event)
+        while not in_queue:
+            time.sleep(.1)
+        else:
+            message = MockMessage(in_queue[-1])
+
+    packet_topic = '/'.join((context.topic, syscfg.get('uid'), 'SUP'))
+    assert message.topic == packet_topic, 'wrong message topic'
+    assert message.decoded.get('timestamp') == 0, f'wrong device timestamp {message.decoded}'
+    assert message.decoded['datahold'].get(key) == expected, f'{key}, {expected} > bad data send: {message.decoded}'
 
 
 def test_event_context_config_request(event_setup, default_config, monkeypatch):
