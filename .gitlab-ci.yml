@@ -1,5 +1,6 @@
 stages:
   - build
+  - test
 
 build:
   stage: build
@@ -9,3 +10,11 @@ build:
     - apt-get install -y --no-install-recommends libglib2.0-0 iproute2 curl
     - python -m pip install --upgrade pip
     - python -m pip install -r ./build_requirements.txt
+  artifacts:
+    paths:
+      - image
+
+test:
+  stage: test
+  script:
+    - python --version
