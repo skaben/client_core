@@ -30,8 +30,10 @@ class BaseDevice:
         """ Abstract method for run device """
         print('application is starting...')
         self.logger.debug(f'device starting as: {self.system} \n {self.config}')
-        event = make_event('device', 'reload')
-        self.q_int.put(event)
+        reload_event = make_event('device', 'reload')
+        request_config = make_event('device', 'cup')
+        for event in [reload_event, request_config]:
+            self.q_int.put(event)
 
     def state_update(self, data):
         """ Update device configuration from user actions
@@ -53,7 +55,6 @@ class BaseDevice:
             event = make_event('device', 'input', delta)
             self.q_int.put(event)
             return event
-        # else do nothing - for mitigating possible loop in q_int 'device'
 
     def state_reload(self):
         """ Re-read and apply device saved state """
