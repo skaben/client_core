@@ -9,7 +9,7 @@ with open('requirements.txt', 'r') as f:
 
 setup(
     name='skabenclient',
-    version='1.15.1',
+    version='1.15.2',
     description='SKABEN client ',
     license="MIT",
     long_description=long_description,
