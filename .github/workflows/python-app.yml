@@ -20,8 +20,6 @@ jobs:
         python-version: 3.7
     - name: Install dependencies
       run: |
-        apt-get update
-        apt-get install -y --no-install-recommends libglib2.0-0 iproute2
         python -m pip install --upgrade pip
         pip install flake8 pytest
         if [ -f build_requirements.txt ]; then pip install -r build_requirements.txt; fi
