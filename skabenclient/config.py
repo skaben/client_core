@@ -2,11 +2,12 @@ import os
 import yaml
 import logging
 import multiprocessing as mp
-from skabenclient.helpers import get_mac, get_ip, FileLock, make_logger
+from skabenclient.helpers import get_mac, get_ip, FileLock
+from skabenclient.logger import make_local_loggers, make_network_logger
 from skabenclient.loaders import get_yaml_loader
 
-loggers = {}
 ExtendedLoader = get_yaml_loader()
+LOGGERS = {}
 
 
 class Config:
@@ -80,13 +81,9 @@ class SystemConfig(Config):
 
     """ Basic skaben read-only configuration """
 
-    uid = None
-    ip = None
-    q_int = None
-    q_ext = None
-
     def __init__(self, config_path=None, root=None):
-        self.data = dict()
+        self.data = {}
+        self.logger_instance = None
         self.root = root if root else os.path.abspath(os.path.dirname(__file__))
         super().__init__(config_path)
 
@@ -113,16 +110,46 @@ class SystemConfig(Config):
             'sub': _subscribe,
         })
 
-    def logger(self, name='main', file_path='local.log', log_level=logging.DEBUG):
-        logger = loggers.get(name)
-        if not logger:
-            logger = make_logger(file_path, log_level)
-            loggers.update({name: logger})
+    def logger(self,
+               file_path=None,
+               level=logging.DEBUG,
+               ):
+
+        if not file_path:
+            file_path = 'local.log'
+
+        if not self.logger_instance:
+            logger = logging.getLogger("main")
+            loc_handlers = make_local_loggers(file_path, level)
+            for handler in loc_handlers:
+                logger.addHandler(handler)
+            ext = self.data.get("external_logging")
+            if ext:
+                self.set_external_handler(logger, ext)
+            logger.setLevel(level)
+            self.logger_instance = logger
+        return self.logger_instance
+
+    def set_external_handler(self, logger, name):
+        try:
+            level_name = name.upper()
+            level = logging.getLevelName(level_name)
+            if not level or not isinstance(level, int):
+                raise Exception
+        except Exception:
+            level = logging.ERROR
+        ext_handler = make_network_logger(self.data["q_int"], level)
+        logger.addHandler(ext_handler)
         return logger
 
     def write(self, data=None, mode=None):
         raise PermissionError('System config cannot be created automatically. '
                               'Seems like config file is missing or corrupted.')
+
+    def __del__(self):
+        if self.logger_instance:
+            self.logger_instance.handlers.clear()
+            del self.logger_instance
 
 
 class DeviceConfig(Config):

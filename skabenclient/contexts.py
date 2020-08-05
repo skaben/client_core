@@ -9,9 +9,6 @@ from skabenproto import packets as sp
 from skabenclient.helpers import make_event
 
 
-# TODO: refactoring
-
-
 class BaseContext:
     """
        Basic context manager abstract class
