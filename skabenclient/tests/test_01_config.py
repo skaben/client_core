@@ -123,7 +123,7 @@ def test_config_system_logger_fpath(get_config, default_config):
     file_path = os.path.join(real_root, 'res', 'logtest.log')
 
     logger = cfg.logger(file_path=file_path,
-                        loc_level=logging.ERROR)
+                        level=logging.ERROR)
 
     assert logger.level == logging.ERROR, f"wrong logging level: {logger}"
     assert len(logger.handlers) == 2, "bad number of logger handlers"
@@ -133,24 +133,33 @@ def test_config_system_logger_fpath(get_config, default_config):
                 f'wrong file path passed to logger handler'
     cfg.logger_instance.handlers.clear()
 
-def test_config_system_logger_external(get_config, default_config, monkeypatch):
+
+@pytest.mark.parametrize("loglevel, loglevelint", (["debug", 10],
+                                                   ["info", 20],
+                                                   ["error", 40],
+                                                   ['bad', 40],
+                                                   [True, 40]))
+def test_config_system_logger_external(get_config, default_config, monkeypatch, loglevel, loglevelint):
     """ Test sending logging message """
 
     int_queue = []
     data = "test"
     conf = default_config('sys')
-    conf.update({"external_logging": True})
+    conf.update({"external_logging": loglevel})
     cfg = get_config(SystemConfig, conf)
 
-    level = logging.ERROR
-
-    logger = cfg.logger(ext_level=level)
-    expected = {"msg": data, "lvl": 40}
+    logger = cfg.logger()
     monkeypatch.setattr(cfg.data["q_int"], "put", lambda x: int_queue.append(x))
 
-    logger.error(data)
+    try:
+        log_call = getattr(logger, loglevel)
+        log_call(data)
+    except Exception:
+        logger.error(data)
 
-    assert len(logger.handlers) == 3, "bad number of logger handlers"
+    expected = {"msg": data, "lvl": loglevelint}
+
+    assert len(logger.handlers) == 3, f"bad number of logger handlers: {logger.handlers}"
     assert int_queue, "queue is empty"
     assert isinstance(int_queue[0], Event), f"bad queue content: {int_queue}"
     assert int_queue[0].data == expected, f"wrong data in event: {int_queue[0]}"
