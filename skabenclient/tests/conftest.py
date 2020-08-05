@@ -3,6 +3,8 @@ import yaml
 import pytest
 import hashlib
 
+from skabenclient.config import LOGGERS
+
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
 @pytest.fixture(scope="module")
@@ -16,7 +18,7 @@ def _iface():
     return iface_name.rstrip()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def get_iface():
     return _iface()
 
@@ -31,7 +33,11 @@ def write_config(config, fname):
         raise
 
 
-@pytest.fixture(scope="module")
+def make_object(obj, path):
+    return obj(path)
+
+
+@pytest.fixture()
 def write_config_fixture():
 
     def _wrap(config, fname):
@@ -40,12 +46,12 @@ def write_config_fixture():
     return _wrap
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def get_config(request):
 
     def _wrap(config_obj, config_dict, **kwargs):
         path = write_config(config_dict, kwargs.get('fname', 'not_named.yml'))
-        config = config_obj(path)
+        config = make_object(config_obj, path)
 
         def _td():
             try:
@@ -62,11 +68,11 @@ def get_config(request):
     return _wrap
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def get_empty_config(request):
 
     def _wrap(config_obj, path):
-        config = config_obj(path)
+        config = make_object(config_obj, path)
 
         def _td():
             try:
@@ -111,7 +117,7 @@ def default_config():
     return _wrap
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def get_hash():
 
     def _wrap(data):
