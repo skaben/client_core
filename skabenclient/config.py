@@ -2,7 +2,8 @@ import os
 import yaml
 import logging
 import multiprocessing as mp
-from skabenclient.helpers import get_mac, get_ip, FileLock, make_logger
+from skabenclient.helpers import get_mac, get_ip, FileLock
+from skabenclient.logger import make_local_loggers, make_network_logger
 from skabenclient.loaders import get_yaml_loader
 
 loggers = {}
@@ -80,11 +81,6 @@ class SystemConfig(Config):
 
     """ Basic skaben read-only configuration """
 
-    uid = None
-    ip = None
-    q_int = None
-    q_ext = None
-
     def __init__(self, config_path=None, root=None):
         self.data = dict()
         self.root = root if root else os.path.abspath(os.path.dirname(__file__))
@@ -113,10 +109,19 @@ class SystemConfig(Config):
             'sub': _subscribe,
         })
 
-    def logger(self, name='main', file_path='local.log', log_level=logging.DEBUG):
+    def logger(self,
+               name='main',
+               file_path='local.log',
+               loc_level=logging.DEBUG,
+               ext_level=logging.ERROR):
         logger = loggers.get(name)
         if not logger:
-            logger = make_logger(file_path, log_level)
+            loc_handlers = make_local_loggers(file_path, loc_level)
+            for handler in loc_handlers:
+                logger.addHandler(handler)
+            if self.data.get("external_logging"):
+                ext_handler = make_network_logger(self.data["q_int"], ext_level)
+                logger.addHandler(ext_handler)
             loggers.update({name: logger})
         return logger
 

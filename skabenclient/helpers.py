@@ -112,21 +112,3 @@ class FileLock:
     def __exit__(self, *err):
         self.release()
         return
-
-
-def make_logger(file_path, log_level):
-    """ Make logger """
-    logging.basicConfig(filename=file_path, level=log_level)
-    logger = logging.getLogger('main')
-    FORMAT = '%(asctime)s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s'
-    log_format = logging.Formatter(FORMAT)
-    # set handlers
-    fh = logging.FileHandler(filename=file_path)
-    stream = logging.StreamHandler()
-    # assign
-    for handler in (fh, stream):
-        handler.setFormatter(log_format)
-        handler.setLevel(log_level)
-        logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-    return logger
