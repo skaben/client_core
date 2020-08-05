@@ -2,7 +2,7 @@ import logging
 from skabenclient.helpers import make_event
 
 
-class ReportHandler(logging.QueueHandler):
+class ReportHandler(logging.handlers.QueueHandler):
 
     """ Transform log records into INFO packets """
 
