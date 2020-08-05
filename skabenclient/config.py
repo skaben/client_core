@@ -112,23 +112,35 @@ class SystemConfig(Config):
 
     def logger(self,
                file_path=None,
-               loc_level=logging.DEBUG,
-               ext_level=logging.ERROR):
+               level=logging.DEBUG,
+               ):
 
         if not file_path:
             file_path = 'local.log'
 
         if not self.logger_instance:
             logger = logging.getLogger("main")
-            loc_handlers = make_local_loggers(file_path, loc_level)
+            loc_handlers = make_local_loggers(file_path, level)
             for handler in loc_handlers:
                 logger.addHandler(handler)
-            if self.data.get("external_logging"):
-                ext_handler = make_network_logger(self.data["q_int"], ext_level)
-                logger.addHandler(ext_handler)
-            logger.setLevel(loc_level)
+            ext = self.data.get("external_logging")
+            if ext:
+                self.set_external_handler(logger, ext)
+            logger.setLevel(level)
             self.logger_instance = logger
         return self.logger_instance
+
+    def set_external_handler(self, logger, name):
+        try:
+            level_name = name.upper()
+            level = logging.getLevelName(level_name)
+            if not level or not isinstance(level, int):
+                raise Exception
+        except Exception:
+            level = logging.ERROR
+        ext_handler = make_network_logger(self.data["q_int"], level)
+        logger.addHandler(ext_handler)
+        return logger
 
     def write(self, data=None, mode=None):
         raise PermissionError('System config cannot be created automatically. '
