@@ -1,4 +1,5 @@
 import logging
+import logging.handlers
 from skabenclient.helpers import make_event
 
 
@@ -9,10 +10,16 @@ class ReportHandler(logging.handlers.QueueHandler):
     def __init__(self, queue):
         super().__init__(queue)
 
-    def prepare(self, data):
-        """ Prepares record as making event for internal queue """
+    def prepares(self, record):
+        return record
+
+    def enqueue(self, record):
+        data = {
+            "msg": record.msg,
+            "lvl": record.levelno
+        }
         event = make_event('device', 'send', data)
-        return event
+        self.queue.put(event)
 
 
 def make_format(format):
@@ -22,7 +29,6 @@ def make_format(format):
 def make_local_loggers(file_path, level):
     """ Make logger """
     handlers = []
-    logging.basicConfig(filename=file_path, level=level)
     log_format = make_format('%(asctime)s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s')
 
     # set handlers
@@ -39,15 +45,8 @@ def make_local_loggers(file_path, level):
 
 def make_network_logger(queue, level):
     handler = ReportHandler(queue)
-    log_format = make_format("%(funcName)s()>  %(levelname)s > %(message)s")
+    log_format = make_format("%(message)s")
     handler.setFormatter(log_format)
     handler.setLevel(level)
 
     return handler
-
-
-def make_logger(handlers):
-    logger = logging.getLogger("main")
-    for handler in handlers:
-        logger.addHandler(handler)
-    return logger
