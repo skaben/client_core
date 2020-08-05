@@ -113,9 +113,12 @@ def test_config_system_logger(get_config, default_config):
     assert len(logger.handlers) == 2, "bad number of logger handlers"
     assert cfg.logger_instance is logger
 
+    cfg.logger_instance.handlers.clear()
+
 def test_config_system_logger_fpath(get_config, default_config):
     """ Test creates SystemConfig logger """
     cfg = get_config(SystemConfig, default_config('sys'))
+
     real_root = os.path.abspath(os.path.dirname(__file__))
     file_path = os.path.join(real_root, 'res', 'logtest.log')
 
@@ -128,9 +131,11 @@ def test_config_system_logger_fpath(get_config, default_config):
         if isinstance(handler, logging.FileHandler):
             assert getattr(handler, 'baseFilename') == file_path, \
                 f'wrong file path passed to logger handler'
+    cfg.logger_instance.handlers.clear()
 
 def test_config_system_logger_external(get_config, default_config, monkeypatch):
     """ Test sending logging message """
+
     int_queue = []
     data = "test"
     conf = default_config('sys')
@@ -149,6 +154,7 @@ def test_config_system_logger_external(get_config, default_config, monkeypatch):
     assert int_queue, "queue is empty"
     assert isinstance(int_queue[0], Event), f"bad queue content: {int_queue}"
     assert int_queue[0].data == expected, f"wrong data in event: {int_queue[0]}"
+    cfg.logger_instance.handlers.clear()
 
 
 def test_config_device_init(get_config, monkeypatch):

@@ -18,7 +18,7 @@ def _iface():
     return iface_name.rstrip()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def get_iface():
     return _iface()
 
@@ -37,7 +37,7 @@ def make_object(obj, path):
     return obj(path)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def write_config_fixture():
 
     def _wrap(config, fname):
@@ -117,7 +117,7 @@ def default_config():
     return _wrap
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def get_hash():
 
     def _wrap(data):
