@@ -60,7 +60,7 @@ class Event:
         self.data = data if data else None
 
     def __repr__(self):
-        return '[ EVENT of type {} with command {} ]'.format(self.type, self.cmd)
+        return f'[ EVENT of type {self.type} with command {self.cmd} data: {self.data} ]'
 
 
 def make_event(_type, cmd, data=None):

@@ -4,9 +4,10 @@ import yaml
 import pytest
 import logging
 
-from skabenclient.config import Config, SystemConfig, DeviceConfig, FileLock, loggers
+from skabenclient.config import Config, SystemConfig, DeviceConfig, FileLock
 from skabenclient.loaders import get_yaml_loader
 from skabenclient.tests.mock.data import yaml_content, yaml_content_as_dict, base_config
+from skabenclient.helpers import Event
 
 
 def test_config_init(get_config):
@@ -103,7 +104,6 @@ def test_config_system_init_base(get_config, default_config):
 
     assert conf_keys == test_keys, 'inconsistent config keys'
 
-
 def test_config_system_logger(get_config, default_config):
     """ Test creates SystemConfig logger """
     cfg = get_config(SystemConfig, default_config('sys'))
@@ -111,10 +111,8 @@ def test_config_system_logger(get_config, default_config):
 
     assert logger.level == logging.DEBUG, "bad logging level"
     assert len(logger.handlers) == 2, "bad number of logger handlers"
-    assert loggers.get('main') is logger
+    assert cfg.logger_instance is logger
 
-
-@pytest.mark.skip(reason='no custom logging yet')
 def test_config_system_logger_fpath(get_config, default_config):
     """ Test creates SystemConfig logger """
     cfg = get_config(SystemConfig, default_config('sys'))
@@ -122,13 +120,35 @@ def test_config_system_logger_fpath(get_config, default_config):
     file_path = os.path.join(real_root, 'res', 'logtest.log')
 
     logger = cfg.logger(file_path=file_path,
-                        log_level=logging.ERROR)
+                        loc_level=logging.ERROR)
 
-    #assert logger.level == logging.ERROR, "bad logging level"
+    assert logger.level == logging.ERROR, f"wrong logging level: {logger}"
+    assert len(logger.handlers) == 2, "bad number of logger handlers"
     for handler in logger.handlers:
-        fname = getattr(handler, 'baseFilename')
-        if fname:
-            assert fname == file_path, 'wrong file path passed to logger handler'
+        if isinstance(handler, logging.FileHandler):
+            assert getattr(handler, 'baseFilename') == file_path, \
+                f'wrong file path passed to logger handler'
+
+def test_config_system_logger_external(get_config, default_config, monkeypatch):
+    """ Test sending logging message """
+    int_queue = []
+    data = "test"
+    conf = default_config('sys')
+    conf.update({"external_logging": True})
+    cfg = get_config(SystemConfig, conf)
+
+    level = logging.ERROR
+
+    logger = cfg.logger(ext_level=level)
+    expected = {"msg": data, "lvl": 40}
+    monkeypatch.setattr(cfg.data["q_int"], "put", lambda x: int_queue.append(x))
+
+    logger.error(data)
+
+    assert len(logger.handlers) == 3, "bad number of logger handlers"
+    assert int_queue, "queue is empty"
+    assert isinstance(int_queue[0], Event), f"bad queue content: {int_queue}"
+    assert int_queue[0].data == expected, f"wrong data in event: {int_queue[0]}"
 
 
 def test_config_device_init(get_config, monkeypatch):
