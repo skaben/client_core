@@ -6,8 +6,8 @@ from skabenclient.helpers import get_mac, get_ip, FileLock
 from skabenclient.logger import make_local_loggers, make_network_logger
 from skabenclient.loaders import get_yaml_loader
 
-loggers = {}
 ExtendedLoader = get_yaml_loader()
+LOGGERS = {}
 
 
 class Config:
@@ -82,7 +82,8 @@ class SystemConfig(Config):
     """ Basic skaben read-only configuration """
 
     def __init__(self, config_path=None, root=None):
-        self.data = dict()
+        self.data = {}
+        self.logger_instance = None
         self.root = root if root else os.path.abspath(os.path.dirname(__file__))
         super().__init__(config_path)
 
@@ -110,24 +111,33 @@ class SystemConfig(Config):
         })
 
     def logger(self,
-               name='main',
-               file_path='local.log',
+               file_path=None,
                loc_level=logging.DEBUG,
                ext_level=logging.ERROR):
-        logger = loggers.get(name)
-        if not logger:
+
+        if not file_path:
+            file_path = 'local.log'
+
+        if not self.logger_instance:
+            logger = logging.getLogger("main")
             loc_handlers = make_local_loggers(file_path, loc_level)
             for handler in loc_handlers:
                 logger.addHandler(handler)
             if self.data.get("external_logging"):
                 ext_handler = make_network_logger(self.data["q_int"], ext_level)
                 logger.addHandler(ext_handler)
-            loggers.update({name: logger})
-        return logger
+            logger.setLevel(loc_level)
+            self.logger_instance = logger
+        return self.logger_instance
 
     def write(self, data=None, mode=None):
         raise PermissionError('System config cannot be created automatically. '
                               'Seems like config file is missing or corrupted.')
+
+    def __del__(self):
+        if self.logger_instance:
+            self.logger_instance.handlers.clear()
+            del self.logger_instance
 
 
 class DeviceConfig(Config):
