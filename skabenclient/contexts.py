@@ -113,7 +113,7 @@ class EventContext(BaseContext):
         # send data to server directly without local db update
         elif command == 'info':
             logging.debug('event is {} - sending data to server'.format(event))
-            return self.config_send(event.data)
+            return self.message_send(event.data)
 
         # input received, update local config, send to server
         elif command == 'input':
@@ -174,6 +174,13 @@ class EventContext(BaseContext):
                 raise Exception(f"unrecognized command: {command}")
         except Exception:
             raise
+
+    def message_send(self, data):
+        packet = sp.INFO(topic=self.topic,
+                         uid=self.uid,
+                         timestamp=self.timestamp,
+                         datahold=data)
+        self.q_ext.put(packet.encode())
 
     def config_send(self, data=None):
         """ Send config to server """

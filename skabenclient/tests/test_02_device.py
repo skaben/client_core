@@ -8,6 +8,8 @@ from skabenclient.helpers import make_event
 from skabenclient.config import SystemConfig, DeviceConfig
 
 
+#TODO: mock external queue and check packages in it
+
 @pytest.fixture
 def get_device(get_config, default_config, monkeypatch):
     devcfg = get_config(DeviceConfig, default_config('dev'), fname='test_cfg.yml')
@@ -59,7 +61,7 @@ def test_device_input_send_msg(get_device, default_config):
     device, devcfg, syscfg = get_device
 
     event = device.send_message(default_config('dev'))
-    test_event = make_event('device', 'send', default_config('dev'))
+    test_event = make_event('device', 'info', default_config('dev'))
 
     assert event.type == test_event.type, 'bad event type'
     assert event.cmd == test_event.cmd, 'bad event command'
