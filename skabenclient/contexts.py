@@ -82,7 +82,6 @@ class EventContext(BaseContext):
     def manage(self, event):
         """ Managing events based on type """
         # receive update from server
-        logging.debug('event is {} WITH DATA {}'.format(event, event.data))
         command = event.cmd.lower()
 
         if command == 'update':
