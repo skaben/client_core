@@ -77,7 +77,7 @@ def test_event_context_info_send(event_setup, monkeypatch, default_config):
     event = make_event('device', 'info', _dict)
 
     with mgr.EventContext(syscfg) as context:
-        monkeypatch.setattr(context, 'config_send', lambda x: x)
+        monkeypatch.setattr(context, 'message_send', lambda x: x)
         result = context.manage(event)
 
     test_conf = syscfg.get('device').config.load()
