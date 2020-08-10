@@ -62,6 +62,6 @@ class BaseDevice:
 
     def send_message(self, data):
         """ Send message to server """
-        event = make_event('device', 'send', data)
+        event = make_event('device', 'info', data)
         self.q_int.put(event)
         return event
