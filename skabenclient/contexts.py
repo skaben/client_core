@@ -79,21 +79,24 @@ class EventContext(BaseContext):
             current = self.device.config.load()
         return current
 
+    def send_task_response(self, event):
+        task_id = event.data.get('task_id', '12345')
+        response = 'ACK'
+        try:
+            self.device.config.save(event.data)
+        except Exception:
+            response = 'NACK'
+            logging.exception('cannot apply new config')
+        finally:
+            return self.confirm_update(task_id, response)
+
     def manage(self, event):
         """ Managing events based on type """
         # receive update from server
         command = event.cmd.lower()
 
         if command == 'update':
-            task_id = event.data.get('task_id', '12345')
-            response = 'ACK'
-            try:
-                self.device.config.save(event.data)
-            except Exception:
-                response = 'NACK'
-                logging.exception('cannot apply new config')
-            finally:
-                return self.confirm_update(task_id, response)
+            return self.send_task_response(event)
 
         # request config from server
         elif command == 'cup':

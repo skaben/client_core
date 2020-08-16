@@ -193,7 +193,7 @@ class MQTTClient(Process):
             self.subscriptions_info = "subscribed to " + ','.join(self.sub)
         except Exception:
             raise
-        
+
         # request config on connect
         request_config_event = make_event("device", "cup")
         self.q_int.put(request_config_event)
