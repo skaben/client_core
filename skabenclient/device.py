@@ -31,9 +31,7 @@ class BaseDevice:
         print('application is starting...')
         self.logger.debug(f'device starting as: {self.system} \n {self.config}')
         reload_event = make_event('device', 'reload')
-        request_config = make_event('device', 'cup')
-        for event in [reload_event, request_config]:
-            self.q_int.put(event)
+        self.q_int.put(reload_event)
 
     def state_update(self, data):
         """ Update device configuration from user actions
