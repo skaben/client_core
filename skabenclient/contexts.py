@@ -99,6 +99,17 @@ class EventContext(BaseContext):
             # TODO: send message to q_ext on fail
             raise
 
+    def send_task_response(self, event):
+        task_id = event.data.get('task_id', '12345')
+        response = 'ACK'
+        try:
+            self.device.config.save(event.data)
+        except Exception:
+            response = 'NACK'
+            logging.exception('cannot apply new config')
+        finally:
+            return self.confirm_update(task_id, response)
+
     def manage(self, event):
         """ Managing events based on type """
         # receive update from server
