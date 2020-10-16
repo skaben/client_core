@@ -9,10 +9,6 @@ from skabenproto import packets as sp
 from skabenclient.helpers import make_event
 
 
-# TODO: refactor naming
-# TODO: merge contexts
-
-
 class BaseContext:
     """
        Context base class
