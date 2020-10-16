@@ -107,13 +107,13 @@ def test_router_exit_by_event(get_router, request, get_from_queue):
 
     request.addfinalizer(_fin)
 
-    event = make_event('device', 'exit')
+    event = make_event('exit')
     syscfg.data['q_int'].put(event)
     expected_event = list(get_from_queue(syscfg.get('q_ext')))
 
     assert expected_event, 'cannot get event from external queue'
     assert not len(expected_event) > 1, 'too many events'
-    assert expected_event[0] == ('exit', 'message'), 'external message not sent'
+    assert expected_event[0].type == 'exit', 'external message not sent'
     assert router.running is False, 'router was not stopped'
     syscfg.logger_instance.handlers.clear()
 

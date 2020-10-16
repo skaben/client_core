@@ -8,7 +8,8 @@ from skabenclient.helpers import make_event
 from skabenclient.config import SystemConfig, DeviceConfig
 
 
-#TODO: mock external queue and check packages in it
+test_complex_dict = {"complex": yaml_content_as_dict}
+
 
 @pytest.fixture
 def get_device(get_config, default_config, monkeypatch):
@@ -30,7 +31,6 @@ def test_device_init(get_device):
     assert device.config.config_path == devcfg.config_path, 'wrong config path'
     assert device.config.data == devcfg.data
 
-test_complex_dict = {"complex": yaml_content_as_dict}
 
 @pytest.mark.parametrize("payload", (base_config, yaml_content_as_dict, test_complex_dict))
 def test_device_input_new(get_device, default_config, payload):

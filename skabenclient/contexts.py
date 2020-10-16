@@ -11,19 +11,19 @@ from skabenclient.helpers import make_event
 
 class BaseContext:
     """
-       Basic context manager abstract class
+       Context base class
+       (separated timestamp management and helper functions)
     """
 
     event = dict()
 
-    def __init__(self, config):
-        self.config = config
-        self.logger = config.logger()
+    def __init__(self, app_config):
+        self.config = app_config
 
+        self.logger = self.config.logger()
         self.q_int = self.config.get('q_int')
         if not self.q_int:
             raise Exception('internal event queue not declared')
-
         self.q_ext = self.config.get('q_ext')
         if not self.q_ext:
             raise Exception('external (to server) event queue not declared')
@@ -35,6 +35,14 @@ class BaseContext:
                 fh.write('0')
 
         self.timestamp = self.get_last_timestamp()
+        self.task_id = ''.join([str(random.randrange(10)) for _ in range(10)])
+
+        # for event context topic is always pub
+        self.topic = self.config.get('pub')
+        self.uid = self.config.get('uid')
+        self.device = self.config.get("device")
+        if not self.device:
+            raise Exception(f'{self} error: device not provided')
 
     def get_last_timestamp(self):
         """ Read previous timestamp value from 'ts' file """
@@ -51,6 +59,25 @@ class BaseContext:
             fh.write(str(int(new_ts)))
             return int(new_ts)
 
+    def get_current_config(self):
+        """ load current device config """
+        current = self.device.config.data
+        if not current:
+            current = self.device.config.load()
+        return current
+
+    def confirm_update(self, task_id, packet_type='ACK'):
+        """ ACK/NACK packet """
+        if packet_type not in ('ACK', 'NACK'):
+            raise Exception(f'packet type not ACK or NACK: {packet_type}')
+
+        packet_class = getattr(sp, packet_type)
+        packet = packet_class(topic=self.config.get('pub'),
+                              timestamp=self.timestamp,
+                              uid=self.config.get('uid'),
+                              task_id=task_id)
+        self.q_ext.put(packet.encode())
+
     def __enter__(self):
         return self
 
@@ -62,22 +89,15 @@ class EventContext(BaseContext):
 
     filtered_keys = ['id', 'uid']
 
-    def __init__(self, config):
-        super().__init__(config)
-        self.task_id = ''.join([str(random.randrange(10)) for _ in range(10)])
-        self.device = config.get('device')
-        # for event context topic is always pub
-        self.topic = self.config.get('pub')
-        self.uid = self.config.get('uid')
-        if not self.device:
-            raise Exception(f'{self} error: device not provided')
-
-    def get_current_config(self):
-        """ load current device config """
-        current = self.device.config.data
-        if not current:
-            current = self.device.config.load()
-        return current
+    def absorb(self, event):
+        try:
+            if event.type == "mqtt":
+                self.manage_mqtt(event)
+            elif event.type == 'device':
+                self.manage(event)
+        except Exception:
+            # TODO: send message to q_ext on fail
+            raise
 
     def send_task_response(self, event):
         task_id = event.data.get('task_id', '12345')
@@ -100,7 +120,7 @@ class EventContext(BaseContext):
 
         # request config from server
         elif command == 'cup':
-            return self.config_request(event.data)
+            return self.send_config_request(event.data)
 
         # send current device config to server
         elif command == 'sup':
@@ -110,19 +130,19 @@ class EventContext(BaseContext):
                 filtered = {k:v for k,v in conf.items() if k in event.data}
                 if filtered:
                     conf = filtered
-            return self.config_send(conf)
+            return self.send_config(conf)
 
         # send data to server directly without local db update
         elif command == 'info':
             logging.debug('event is {} - sending data to server'.format(event))
-            return self.message_send(event.data)
+            return self.send_message(event.data)
 
         # input received, update local config, send to server
         elif command == 'input':
             logging.debug('input event is {} - input: {}'.format(event, event.data))
             if event.data:
                 self.device.config.save(event.data)
-                return self.config_send(event.data)
+                return self.send_config(event.data)
             else:
                 logging.error('missing data from event: {}'.format(event))
 
@@ -146,7 +166,7 @@ class EventContext(BaseContext):
 
         if command == 'WAIT':
             # send me to the future
-            self.rewrite_ts(timestamp + datahold['timeout'])
+            self.rewrite_timestamp(timestamp + datahold['timeout'])
             return
 
         if timestamp < self.timestamp:
@@ -165,11 +185,11 @@ class EventContext(BaseContext):
                                  timestamp=self.timestamp)
                 self.q_ext.put(packet.encode())
             elif command == 'CUP':
-                # pass to internal event context
+                # update local configuration from packet data
                 event = make_event('device', 'update', datahold)
                 self.q_int.put(event)
             elif command == 'SUP':
-                # pass to internal event context
+                # send local configuration to server (filtered by field list)
                 event = make_event('device', 'sup', datahold.get('fields'))
                 self.q_int.put(event)
             else:
@@ -177,15 +197,16 @@ class EventContext(BaseContext):
         except Exception:
             raise
 
-    def message_send(self, data):
+    def send_message(self, data):
+        """ INFO packet """
         packet = sp.INFO(topic=self.topic,
                          uid=self.uid,
                          timestamp=self.timestamp,
                          datahold=data)
         self.q_ext.put(packet.encode())
 
-    def config_send(self, data=None):
-        """ Send config to server """
+    def send_config(self, data=None):
+        """ SUP packet """
         try:
             if not data:
                 raise Exception("empty data")
@@ -203,8 +224,8 @@ class EventContext(BaseContext):
         except Exception as e:
             logging.exception(f"error in context config send - {e} \n {self}")
 
-    def config_request(self, keys=None):
-        """ Request config from server """
+    def send_config_request(self, keys=None):
+        """ CUP packet """
         current = self.get_current_config()
         if keys:
             datahold = {'request': [k for k in current if k in keys]}
@@ -218,19 +239,17 @@ class EventContext(BaseContext):
                         datahold=datahold)
         self.q_ext.put(packet.encode())
 
-    def confirm_update(self, task_id, packet_type='ACK'):
-        """ Confirm to server that we received and applied config
-            should be initialized only after device handler success
-        """
-        if packet_type not in ('ACK', 'NACK'):
-            raise Exception(f'packet type not ACK or NACK: {packet_type}')
-
-        packet_class = getattr(sp, packet_type)
-        packet = packet_class(topic=self.config.get('pub'),
-                              timestamp=self.timestamp,
-                              uid=self.config.get('uid'),
-                              task_id=task_id)
-        self.q_ext.put(packet.encode())
+    def send_task_response(self, event):
+        """ ACK/NACK packet """
+        task_id = event.data.get('task_id', '12345')
+        response = 'ACK'
+        try:
+            self.device.config.save(event.data)
+        except Exception:
+            response = 'NACK'
+            logging.exception('cannot apply new config')
+        finally:
+            return self.confirm_update(task_id, response)
 
 
 class Router(Thread):
@@ -243,6 +262,8 @@ class Router(Thread):
         queues separated because of server messages top priority
     """
 
+    managed_events = ["exit", "device", "mqtt"]
+
     def __init__(self, config):
         super().__init__()
         self.daemon = True
@@ -250,38 +271,32 @@ class Router(Thread):
         self.q_int = config.get("q_int")
         self.q_ext = config.get("q_ext")
         self.logger = config.logger()
-        self.config = config  # for passing to contexts
+        # passing to contexts
+        self.config = config
 
     def run(self):
         """ Routing events from internal queue """
         self.logger.debug('router module starting...')
         self.running = True
+
         while self.running:
             if self.q_int.empty():
                 time.sleep(.1)
                 continue
+
+            # get event from internal queue
             try:
-                # get event from internal queue
                 event = self.q_int.get()
 
-                # packets with label 'mqtt' comes from server
-                if event.type == 'mqtt':
-                    # decode and parse it with MQTTParseContext
-                    with EventContext(self.config) as context:
-                        context.manage_mqtt(event)
+                if event.type not in self.managed_events:
+                    raise Exception('cannot determine message type for:\n{}'.format(event))
+                elif event.type == "exit":
+                    self.q_ext.put(event)
+                    return self.stop()
 
-                # packets with label 'device' comes from self, client
-                elif event.type == 'device':
-                    # catch exit from end device, stopping client
-                    if event.cmd == 'exit':
-                        self.q_ext.put(('exit', 'message'))
-                        self.stop()
-                        break
-                    # or normally manage event with main context
-                    with EventContext(self.config) as context:
-                        context.manage(event)
-                else:
-                    self.logger.error('cannot determine message type for:\n{}'.format(event))
+                with EventContext(self.config) as context:
+                    context.absorb(event)
+
             except Exception:
                 self.logger.exception('exception in manager context:')
                 self.stop()
