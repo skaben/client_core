@@ -5,7 +5,8 @@ ENV PYTHONUBUFFERED=1
 ENV PATH="/venv/bin:$PATH"
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libglib2.0-0 iproute2 curl
+    apt-get install -y --no-install-recommends libglib2.0-0 iproute2 curl gcc \
+    portaudio19-dev python3-pyaudio
 
 COPY build_requirements.txt /build_requirements.txt
 
