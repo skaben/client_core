@@ -43,6 +43,7 @@ class MQTTClient(Process):
 
     ch = dict()
     subscriptions_info = ''
+    default_timeout = 2
 
     def __init__(self, config):
         super().__init__()
@@ -91,7 +92,7 @@ class MQTTClient(Process):
             if self.running is False:
                 return
             self.client.loop()  # manual loop while not connected
-            sleep_time = 2  # default sleep time
+            sleep_time = self.default_timeout  # default sleep time
             tries += 1
             print(f':: trying MQTT broker: {tries}, next try after {sleep_time}s')
             try:
@@ -165,7 +166,7 @@ class MQTTClient(Process):
             logging.warning(f'unexpected disconnect (code {rc}).\ntrying auto-reconnect...')
             self.is_connected = False
             self.client.loop_stop()
-            time.sleep(1)
+            time.sleep(self.default_timeout)
             # don't want to mess with paho reconnection routines, just recreate the client
             self.client = self.init_client()
             result = self.connect_client()
@@ -192,6 +193,10 @@ class MQTTClient(Process):
             self.subscriptions_info = "subscribed to " + ','.join(self.sub)
         except Exception:
             raise
+
+        # request config on connect
+        request_config_event = make_event("device", "cup")
+        self.q_int.put(request_config_event)
 
     def on_disconnect(self, client, userdata, rc):
         logging.info('disconnected from broker')

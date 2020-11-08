@@ -261,6 +261,7 @@ def test_config_device_restore_broken(get_config, write_config_fixture, monkeypa
 
     assert should_be_default == is_default, 'configs not matched'
 
+
 @pytest.mark.parametrize('config_dict', (base_config,))
 def test_config_device_restore_missing(get_config, config_dict, monkeypatch, write_config_fixture):
     """ Test DeviceConfig restore when file is corrupted """
