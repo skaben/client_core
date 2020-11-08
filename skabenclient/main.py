@@ -18,7 +18,7 @@ def start_app(app_config, device):
     try:
         mqttc.start()
         router.start()
-        app_config.get('device').run()
+        device.run()
         print(f'running application with config:\n {app_config}')
     except KeyboardInterrupt:
         print('catched keyboard interrupt')

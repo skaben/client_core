@@ -54,16 +54,16 @@ class Event:
 
     """ Simple internal event """
 
-    def __init__(self, _type, cmd, data=None):
+    def __init__(self, _type, cmd=None, data=None):
         self.type = _type
         self.cmd = cmd
-        self.data = data if data else None
+        self.data = data
 
     def __repr__(self):
         return f'[ EVENT of type {self.type} with command {self.cmd} data: {self.data} ]'
 
 
-def make_event(_type, cmd, data=None):
+def make_event(_type, cmd=None, data=None):
     """ event making interface """
     try:
         event = Event(_type, cmd, data)
