@@ -35,7 +35,7 @@ class BaseDevice:
     def stop(self):
         print('device is stopping...')
         self.logger.debug(f"stopping device {self}")
-        end_event = make_event("exit", '')
+        end_event = make_event("exit")
         self.q_int.put(end_event)
 
     def state_update(self, data):

@@ -104,8 +104,9 @@ class EventContext(BaseContext):
         # receive update from server
         command = event.cmd.lower()
 
+        # update from server received, save to local config
         if command == 'update':
-            return self.send_task_response(event)
+            return self.save_config_and_report(event)
 
         # request config from server
         elif command == 'cup':
@@ -228,7 +229,7 @@ class EventContext(BaseContext):
                         datahold=datahold)
         self.q_ext.put(packet.encode())
 
-    def send_task_response(self, event):
+    def save_config_and_report(self, event):
         """ ACK/NACK packet """
         task_id = event.data.get('task_id', '12345')
         response = 'ACK'
