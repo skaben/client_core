@@ -48,10 +48,7 @@ class BaseContext:
         """ Read previous timestamp value from 'ts' file """
         with open(self.timestamp_fname, 'r') as fh:
             t = fh.read().rstrip()
-            if t:
-                return int(t)
-            else:
-                return 0
+            return int(t) or 0
 
     def rewrite_timestamp(self, new_ts):
         """ Write timestamp value to file 'ts' """
@@ -99,13 +96,26 @@ class EventContext(BaseContext):
             # TODO: send message to q_ext on fail
             raise
 
+    def send_task_response(self, event):
+        task_id = event.data.get('task_id', '12345')
+        response = 'ACK'
+        try:
+            if event.type == "mqtt":
+                self.manage_mqtt(event)
+            elif event.type == 'device':
+                self.manage(event)
+        except Exception:
+            # TODO: send message to q_ext on fail
+            raise
+
     def manage(self, event):
         """ Managing events based on type """
         # receive update from server
         command = event.cmd.lower()
 
+        # update from server received, save to local config
         if command == 'update':
-            return self.send_task_response(event)
+            return self.save_config_and_report(event)
 
         # request config from server
         elif command == 'cup':
@@ -123,30 +133,29 @@ class EventContext(BaseContext):
 
         # send data to server directly without local db update
         elif command == 'info':
-            logging.debug('event is {} - sending data to server'.format(event))
+            logging.debug(f'sending {event.data} to server')
             return self.send_message(event.data)
 
         # input received, update local config, send to server
         elif command == 'input':
-            logging.debug('input event is {} - input: {}'.format(event, event.data))
+            logging.debug(f'new input: {event.data}')
             if event.data:
                 self.device.config.save(event.data)
                 return self.send_config(event.data)
             else:
-                logging.error('missing data from event: {}'.format(event))
+                logging.error(f'missing data from event: {event}')
 
         # reload device with current local config
         elif command in ('reload', 'reset'):
-            logging.debug('event is {} - reloading device'.format(event))
+            logging.debug('RESET event, reloading device')
             return self.device.state_reload()
 
-        # report bad event type
         else:
-            logging.error('bad event {}'.format(event))
+            logging.error(f'bad event {event}')
 
     def manage_mqtt(self, event):
-        """ Manage event from MQTT based on command
-            Translate commands into internal event queue
+        """Manage event from MQTT based on command
+           Translate commands into internal event queue
         """
 
         command = event.data.get('command')
@@ -228,7 +237,7 @@ class EventContext(BaseContext):
                         datahold=datahold)
         self.q_ext.put(packet.encode())
 
-    def send_task_response(self, event):
+    def save_config_and_report(self, event):
         """ ACK/NACK packet """
         task_id = event.data.get('task_id', '12345')
         response = 'ACK'
