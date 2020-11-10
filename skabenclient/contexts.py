@@ -48,10 +48,7 @@ class BaseContext:
         """ Read previous timestamp value from 'ts' file """
         with open(self.timestamp_fname, 'r') as fh:
             t = fh.read().rstrip()
-            if t:
-                return int(t)
-            else:
-                return 0
+            return int(t) or 0
 
     def rewrite_timestamp(self, new_ts):
         """ Write timestamp value to file 'ts' """
@@ -135,30 +132,29 @@ class EventContext(BaseContext):
 
         # send data to server directly without local db update
         elif command == 'info':
-            logging.debug('event is {} - sending data to server'.format(event))
+            logging.debug(f'sending {event.data} to server')
             return self.send_message(event.data)
 
         # input received, update local config, send to server
         elif command == 'input':
-            logging.debug('input event is {} - input: {}'.format(event, event.data))
+            logging.debug(f'new input: {event.data}')
             if event.data:
                 self.device.config.save(event.data)
                 return self.send_config(event.data)
             else:
-                logging.error('missing data from event: {}'.format(event))
+                logging.error(f'missing data from event: {event}')
 
         # reload device with current local config
         elif command in ('reload', 'reset'):
-            logging.debug('event is {} - reloading device'.format(event))
+            logging.debug('RESET event, reloading device')
             return self.device.state_reload()
 
-        # report bad event type
         else:
-            logging.error('bad event {}'.format(event))
+            logging.error(f'bad event {event}')
 
     def manage_mqtt(self, event):
-        """ Manage event from MQTT based on command
-            Translate commands into internal event queue
+        """Manage event from MQTT based on command
+           Translate commands into internal event queue
         """
 
         command = event.data.get('command')
