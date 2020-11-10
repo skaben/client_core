@@ -236,6 +236,7 @@ class EventContext(BaseContext):
                         datahold=datahold)
         self.q_ext.put(packet.encode())
 
+
     def save_config_and_report(self, event):
         """ ACK/NACK packet """
         task_id = event.data.get('task_id', '12345')
