@@ -13,10 +13,13 @@ def start_app(app_config, device):
 
     app_config.update({'device': device})  # update config for easy access to device instance
     router = Router(app_config)  # initialize router for internal events
-    mqttc = MQTTClient(app_config)  # initialize MQTT client for talking with server
+    mqtt_client = None
+    standalone = app_config.get("standalone")
 
     try:
-        mqttc.start()
+        if not standalone:
+            mqtt_client = MQTTClient(app_config)  # initialize MQTT client for talking with server
+            mqtt_client.start()
         router.start()
         device.run()
         print(f'running application with config:\n {app_config}')
@@ -27,4 +30,5 @@ def start_app(app_config, device):
         raise
     finally:
         router.join(.5)
-        mqttc.join(.5)
+        if mqtt_client:
+            mqtt_client.join(.5)

@@ -6,8 +6,12 @@ from skabenclient.helpers import get_mac, get_ip, FileLock
 from skabenclient.logger import make_local_loggers, make_network_logger
 from skabenclient.loaders import get_yaml_loader
 
+import collections.abc
+
 ExtendedLoader = get_yaml_loader()
 LOGGERS = {}
+
+_mapping = collections.abc.Mapping
 
 
 class Config:
@@ -28,11 +32,11 @@ class Config:
         current = self.read()
         self.update(current)
 
-    def _yaml_load(self, source):
+    def _yaml_load(self, target):
         """ Loads yaml with correct Loader """
-        result = yaml.load(source, Loader=ExtendedLoader)
+        result = yaml.load(target, Loader=ExtendedLoader)
         if not result:
-            raise EOFError(f"{source} cannot be loaded")
+            raise EOFError(f"{target} cannot be loaded")
         return result
 
     def read(self):
@@ -65,10 +69,33 @@ class Config:
         """ Set compatibility wrapper """
         return self.update({key: val})
 
-    def update(self, payload):
+    def update(self, payload: dict):
         """ Updates local namespace from payload with basic filtering """
-        self.data.update(self._filter(payload))
+        update_target = self.data
+        # destructive update
+        if payload.get("FORCE"):
+            payload.pop("FORCE")
+            update_target = self.minimal_essential_conf
+        self.data = self._update_nested(update_target, self._filter(payload))
         return self.data
+
+    def _update_nested(self, target: dict, update: _mapping) -> dict:
+        for k, v in update.items():
+            try:
+                if isinstance(v, _mapping):
+                    key = target.get(k)
+                    if key is None:
+                        target.update({k: v})
+                        continue
+                    elif not isinstance(key, _mapping):
+                        target[k] = {}
+                    target[k] = self._update_nested(target[k], v)
+                else:
+                    target[k] = v
+            except Exception as exc:
+                raise Exception(f"TARGET: {target} ({type(target)}) "
+                                f"KEY: {k} ({type(target)}) updated by VAL: {v} \n {exc}")
+        return dict(target)
 
     def _filter(self, payload):
         """ Filter keys starting with underscore and by filtered keys list """
@@ -210,7 +237,7 @@ class DeviceConfig(Config):
         """ Apply and save persistent state """
         if payload:
             self.update(payload)
-        return self.write(payload)
+        self.write(self.data)
 
     def current(self):
         """ Get current config """
