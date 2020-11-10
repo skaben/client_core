@@ -42,10 +42,11 @@ def test_event_extended_dict(event_setup, default_config):
 def test_event_context_update(event_setup, monkeypatch):
     """ Test update command """
     syscfg = event_setup()
-    event = make_event('device', 'update', {'value': 'newval',
-                                            'task_id': 123123})
     syscfg.get('device').config.set('value', 'oldval')
     syscfg.get('device').config.save()
+
+    event = make_event('device', 'update', {'value': 'newval',
+                                            'task_id': 123123})
 
     with mgr.EventContext(syscfg) as context:
         monkeypatch.setattr(context, 'confirm_update', lambda *args: {'task_id': args[0],
