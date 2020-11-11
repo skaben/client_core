@@ -31,4 +31,8 @@ def start_app(app_config, device):
     finally:
         router.join(.5)
         if mqtt_client:
+<<<<<<< skabenclient/main.py
             mqtt_client.join(.5)
+=======
+            mqtt_client.join(.5)
+>>>>>>> skabenclient/main.py
