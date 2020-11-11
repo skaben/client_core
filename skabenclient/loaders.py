@@ -203,8 +203,19 @@ class HTTPLoader:
 
         self.http = http
 
+    def parse_url(self, remote_url: str) -> dict:
+        arr = remote_url.split('/')
+        if len(arr[-1].split(".")) < 2:
+            raise Exception('Target URL missing file extension. Provide local filename: '
+                            'HTTPLoader.get(remote_url, local_file="file.extension")')
+
+        return {
+            "file": arr[-1],
+            "base": '/'.join(arr[:3]),
+        }
+
     def get(self, remote_url: str, local_file: str = None) -> Union[str, bool]:
-        file_name = local_file or remote_url.split("/")[-1]
+        file_name = local_file or self.parse_url(remote_url)['file']
         local_path = os.path.join(self.local_dir, file_name)
         self.logger.debug(f"... retrieving {remote_url}")
         self.http.get(f"{remote_url}", stream=True)
