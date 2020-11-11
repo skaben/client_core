@@ -11,6 +11,7 @@ class BaseDevice:
     """
 
     config_class = DeviceConfig
+    timers = {}
 
     def __init__(self, app_config, device_config):
         if not isinstance(app_config, SystemConfig):
@@ -28,7 +29,7 @@ class BaseDevice:
 
     def run(self):
         print('application is starting...')
-        self.logger.debug(f'device starting as: {self.system} \n {self.config}')
+        self.logger.debug(f'{self} starting with device config: \n {self.config}')
         reload_event = make_event('device', 'reload')
         self.q_int.put(reload_event)
 
@@ -38,7 +39,7 @@ class BaseDevice:
         end_event = make_event("exit")
         self.q_int.put(end_event)
 
-    def state_update(self, data):
+    def state_update(self, data: dict):
         """ Update device configuration from user actions
 
             When new data from user actions received, check current config and if changed,
@@ -63,8 +64,23 @@ class BaseDevice:
         """ Re-read and apply device saved state """
         return self.config.load()
 
-    def send_message(self, data):
+    def send_message(self, data: dict):
         """ Send message to server """
         event = make_event('device', 'info', data)
         self.q_int.put(event)
         return event
+
+    def new_timer(self, start: int, count: int, name: str) -> str:
+        if int(count) > 0:
+            timer = start + count
+            self.timers.update({name: timer})
+            self.logger.debug(f"timer set at {start} with name {name} to {count}s")
+            return self.timers[name]
+
+    def check_timer(self, name: str, now: int) -> bool:
+        timer = self.timers.get(name)
+        if timer and timer <= now:
+            return timer
+
+    def __str__(self):
+        return f"Basic Device <{self.system}>"
