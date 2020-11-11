@@ -6,6 +6,8 @@ from flask import Flask
 
 from skabenclient.config import LOGGERS
 
+from skabenclient.config import LOGGERS
+
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
 @pytest.fixture(scope="module")
