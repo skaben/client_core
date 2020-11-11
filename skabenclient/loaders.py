@@ -5,6 +5,12 @@ import logging
 import pygame as pg
 import pygame.mixer as mixer
 
+from typing import Union
+
+import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
 
 def get_yaml_loader():
 
@@ -30,7 +36,7 @@ class SoundLoader:
 
     enabled = None
 
-    def __init__(self, sound_dir, channel_list=None):
+    def __init__(self, sound_dir: str, channel_list: list = None):
         if not channel_list:
             channel_list = ['bg', 'fg', 'fx']
         self.sound = {}
@@ -73,7 +79,7 @@ class SoundLoader:
         except Exception:
             raise
 
-    def stop(self, channel):
+    def stop(self, channel: str):
         """ Stops all sound in selected channel """
         try:
             ch = self.channels.get(channel)
@@ -82,7 +88,7 @@ class SoundLoader:
         except Exception:
             raise
 
-    def fadeout(self, fadeout_time, channels=None):
+    def fadeout(self, fadeout_time: int, channels: list = None):
         """ Fade out sound in selected channel list, or all"""
         mixer = list()
         if not channels:
@@ -97,14 +103,14 @@ class SoundLoader:
         except Exception:
             raise
 
-    def mute(self, channel, mute=True):
+    def mute(self, channel: str, mute: bool = True):
         """ Mute selected channel """
         if mute:
             self.channels.get(channel).set_volume(0)
         else:
             self.channels.get(channel).set_volume(1)
 
-    def _snd(self, fname, volume=None):
+    def _snd(self, fname: str, volume: int = None):
         """ Loads sound from .ogg to pygame mixer.Sound object """
         if not volume:
             volume = 1
@@ -121,7 +127,7 @@ class SoundLoader:
 
 class ImageLoader:
 
-    """ Image Loader class
+    """[DEPRECATED] due to remove of pygame-based GUI
 
         Loads images from directories, scaling images, provide pygame image objects.
     """
@@ -162,3 +168,62 @@ class ImageLoader:
             percent = round(h / _o.height, 2)
             img = pg.transform.scale(img, (w, int(_o.height * percent)))
         return img
+
+
+class HTTPLoader:
+    """File loader context manager. Loads file from url
+
+        from skabenclient.loaders import HTTPLoader
+
+        http = HTTPLoader(system_config, local_directory)
+        http.get(url, local_filename)
+    """
+
+    def __init__(self, system_config, local_dir: str):
+        self.local_dir = local_dir
+
+        if not local_dir:
+            raise Exception("local directory for HTTP Loader must be specified")
+
+        self.retries = system_config.get('http_retries', 5)
+        self.logger = system_config.logger() or logging
+
+        retry_strategy = Retry(
+            total=self.retries,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            method_whitelist=["HEAD", "GET", "OPTIONS"]
+        )
+
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+
+        http = requests.Session()
+        http.mount("https://", adapter)
+        http.mount("http://", adapter)
+
+        self.http = http
+
+    def get(self, remote_url: str, local_file: str = None) -> Union[str, bool]:
+        file_name = local_file or remote_url.split("/")[-1]
+        local_path = os.path.join(self.local_dir, file_name)
+        self.logger.debug(f"... retrieving {remote_url}")
+        self.http.get(f"{remote_url}", stream=True)
+
+        try:
+            response = requests.get(remote_url, stream=True)
+            with open(local_path, 'wb') as fh:
+                for data in response.iter_content():
+                    fh.write(data)
+            return local_path
+        except Exception:
+            self.logger.exception(f'cannot retrieve {remote_url}')
+            return False
+
+    def __str__(self):
+        return f"HTTPLoader <{self.local_dir}>"
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *err):
+        return

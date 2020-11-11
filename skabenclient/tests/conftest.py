@@ -2,6 +2,7 @@ import os
 import yaml
 import pytest
 import hashlib
+from flask import Flask
 
 from skabenclient.config import LOGGERS
 
@@ -128,3 +129,9 @@ def get_hash():
         return hash
 
     return _wrap
+
+
+@pytest.fixture(scope="session")
+def app():
+    app = Flask(__name__)
+    return app
