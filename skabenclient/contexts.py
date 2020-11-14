@@ -96,18 +96,6 @@ class EventContext(BaseContext):
             # TODO: send message to q_ext on fail
             raise
 
-    def send_task_response(self, event):
-        task_id = event.data.get('task_id', '12345')
-        response = 'ACK'
-        try:
-            if event.type == "mqtt":
-                self.manage_mqtt(event)
-            elif event.type == 'device':
-                self.manage(event)
-        except Exception:
-            # TODO: send message to q_ext on fail
-            raise
-
     def manage(self, event):
         """ Managing events based on type """
         # receive update from server
