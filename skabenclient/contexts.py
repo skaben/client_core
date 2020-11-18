@@ -275,7 +275,7 @@ class Router(Thread):
                 event = self.q_int.get()
 
                 if event.type not in self.managed_events:
-                    raise Exception('cannot determine message type for:\n{}'.format(event))
+                    raise Exception(f"cannot determine message type for:\n{event}")
                 elif event.type == "exit":
                     self.q_ext.put(event)
                     return self.stop()
@@ -285,7 +285,6 @@ class Router(Thread):
 
             except Exception:
                 self.logger.exception('exception in manager context:')
-                self.stop()
 
     def stop(self):
         """ Full stop """
