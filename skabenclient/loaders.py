@@ -1,6 +1,7 @@
 import os
 import time
 import yaml
+import json
 import logging
 import pygame as pg
 import pygame.mixer as mixer
@@ -179,13 +180,11 @@ class HTTPLoader:
         http.get(url, local_filename)
     """
 
-    def __init__(self, system_config, local_dir: str):
-        self.local_dir = local_dir
+    retries_number = 3
 
-        if not local_dir:
-            raise Exception("local directory for HTTP Loader must be specified")
+    def __init__(self, system_config):
 
-        self.retries = system_config.get('http_retries', 5)
+        self.retries = system_config.get('http_retries', self.retries_number)
         self.logger = system_config.logger() or logging
 
         retry_strategy = Retry(
@@ -206,18 +205,31 @@ class HTTPLoader:
     def parse_url(self, remote_url: str) -> dict:
         arr = remote_url.split('/')
         if len(arr[-1].split(".")) < 2:
-            raise Exception('Target URL missing file extension. Provide local filename: '
-                            'HTTPLoader.get(remote_url, local_file="file.extension")')
+            raise Exception('Provide FULL local filename: '
+                            'HTTPLoader.get_file(remote_url, local_path="file.extension")')
 
         return {
             "file": arr[-1],
             "base": '/'.join(arr[:3]),
         }
 
-    def get(self, remote_url: str, local_file: str = None) -> Union[str, bool]:
-        file_name = local_file or self.parse_url(remote_url)['file']
-        local_path = os.path.join(self.local_dir, file_name)
-        self.logger.debug(f"... retrieving {remote_url}")
+    def get_json(self, remote_url: str) -> dict:
+        self.logger.debug(f"... retrieving JSON from {remote_url}")
+        result = {}
+        try:
+            response = requests.get(remote_url)
+            result = response.json()
+        except Exception as e:
+            raise Exception(f"... failed to get JSON from {remote_url}: {e}")
+        finally:
+            return result
+
+    def get_file(self, remote_url: str, local_path: str) -> Union[str, bool]:
+        if os.path.isdir(local_path):
+            file_name = self.parse_url(remote_url)['file']
+            local_path = os.path.join(local_path, file_name)
+
+        self.logger.debug(f"... retrieving FILE from {remote_url} to {local_path}")
         self.http.get(f"{remote_url}", stream=True)
 
         try:
@@ -226,12 +238,11 @@ class HTTPLoader:
                 for data in response.iter_content():
                     fh.write(data)
             return local_path
-        except Exception:
-            self.logger.exception(f'cannot retrieve {remote_url}')
-            return False
+        except Exception as e:
+            raise Exception(f'cannot retrieve {remote_url}: {e}')
 
     def __str__(self):
-        return f"HTTPLoader <{self.local_dir}>"
+        return f"HTTPLoader <{self.retries_number}>"
 
     def __enter__(self):
         return self

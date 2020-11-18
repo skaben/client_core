@@ -51,24 +51,22 @@ def test_serve_file(live_server):
     live_server.stop()
 
 
-# try to get file
-
-def test_http_loader(live_server, get_config, default_config):
+def test_http_loader_get_json(live_server, get_config, default_config):
     cfg = get_config(SystemConfig, default_config('sys'))
-    path = os.path.join(REMOTE_DIR, "snd.ogg")
-    local_file = "sound.ogg"
+    data = {"data": {"valid": ['json', 'json', 'json']}}
+
+    @live_server.app.route('/json')
+    def json():
+        return data
 
     live_server.start()
 
-    with HTTPLoader(system_config=cfg, local_dir=LOCAL_DIR) as loader:
-        getfile_path = loader.get(url_for("send_file", _external=True), local_file)
+    with HTTPLoader(cfg) as loader:
+        result = loader.get_json(url_for("json", _external=True))
 
     live_server.stop()
 
-    assert getfile_path == os.path.join(LOCAL_DIR, local_file)
-    assert read_bin(getfile_path) == read_bin(path)
-
-    os.remove(getfile_path)
+    assert result == data, "incorrect data from JSON"
 
 
 URLS = [
@@ -79,31 +77,53 @@ URLS = [
 @pytest.mark.parametrize("url, url_fname, url_base", URLS)
 def test_http_loader_parse_url(url, url_fname, url_base, get_config, default_config):
     cfg = get_config(SystemConfig, default_config('sys'))
-    with HTTPLoader(cfg, LOCAL_DIR) as loader:
+    with HTTPLoader(cfg) as loader:
         result = loader.parse_url(url)
 
     assert result.get("file") == url_fname, "url filename parsed wrong"
     assert result.get("base") == url_base, "url base parsed wrong"
 
 
-def test_http_loader_no_ext_in_url(live_server, get_config, default_config):
+def test_http_loader_get_file(live_server, get_config, default_config):
     cfg = get_config(SystemConfig, default_config('sys'))
+    path = os.path.join(REMOTE_DIR, "snd.ogg")
+    local_path = os.path.join(LOCAL_DIR, "sound.ogg")
+
+    live_server.start()
+
+    with HTTPLoader(cfg) as loader:
+        getfile_path = loader.get_file(url_for("send_file", _external=True), local_path)
+
+    live_server.stop()
+
+    assert getfile_path == local_path
+    assert read_bin(getfile_path) == read_bin(path)
+
+    os.remove(getfile_path)
+
+
+def test_http_loader_file_no_ext_in_url_no_local_fname(live_server, get_config, default_config):
+    cfg = get_config(SystemConfig, default_config('sys'))
+    local_path = LOCAL_DIR
 
     live_server.start()
 
     with pytest.raises(Exception) as exc:
-        with HTTPLoader(system_config=cfg, local_dir=LOCAL_DIR) as loader:
-            loader.get(url_for("send_file", _external=True))
+        with HTTPLoader(cfg) as loader:
+            loader.get_file(url_for("send_file", _external=True), local_path=local_path)
 
     live_server.stop()
 
-    assert str(exc.value) == 'Target URL missing file extension. Provide local filename: '\
-                             'HTTPLoader.get(remote_url, local_file="file.extension")'
+    assert str(exc.value) == 'Provide FULL local filename: '\
+                             'HTTPLoader.get_file(remote_url, local_path="file.extension")'
 
 
-def test_http_loader_has_ext_in_url(live_server, get_config, default_config):
+def test_http_loader_file_has_ext_in_url(live_server, get_config, default_config):
     cfg = get_config(SystemConfig, default_config('sys'))
     fname = "snd.ogg"
+
+    remote_path = os.path.join(REMOTE_DIR, fname)
+    local_path = os.path.join(LOCAL_DIR, "sound.ogg")
 
     @live_server.app.route('/files/<filename>')
     def file_named(filename):
@@ -111,13 +131,12 @@ def test_http_loader_has_ext_in_url(live_server, get_config, default_config):
 
     live_server.start()
 
-    with HTTPLoader(system_config=cfg, local_dir=LOCAL_DIR) as loader:
-        getfile_path = loader.get(url_for("file_named", filename=fname, _external=True))
+    with HTTPLoader(cfg) as loader:
+        getfile_path = loader.get_file(url_for("file_named", filename=fname, _external=True), local_path)
 
     live_server.stop()
 
-    assert getfile_path == os.path.join(LOCAL_DIR, fname)
-    assert read_bin(getfile_path) == read_bin(os.path.join(REMOTE_DIR, fname))
+    assert getfile_path == local_path
+    assert read_bin(getfile_path) == read_bin(remote_path)
 
     os.remove(getfile_path)
-
