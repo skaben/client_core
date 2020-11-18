@@ -1,7 +1,6 @@
 import os
 import time
 import random
-import logging
 
 from threading import Thread
 
@@ -96,62 +95,53 @@ class EventContext(BaseContext):
             # TODO: send message to q_ext on fail
             raise
 
-    def send_task_response(self, event):
-        task_id = event.data.get('task_id', '12345')
-        response = 'ACK'
-        try:
-            if event.type == "mqtt":
-                self.manage_mqtt(event)
-            elif event.type == 'device':
-                self.manage(event)
-        except Exception:
-            # TODO: send message to q_ext on fail
-            raise
-
     def manage(self, event):
         """ Managing events based on type """
-        # receive update from server
-        command = event.cmd.lower()
+        try:
+            # receive update from server
+            command = event.cmd.lower()
 
-        # update from server received, save to local config
-        if command == 'update':
-            return self.save_config_and_report(event)
+            # update from server received, save to local config
+            if command == 'update':
+                return self.save_config_and_report(event)
 
-        # request config from server
-        elif command == 'cup':
-            return self.send_config_request(event.data)
+            # request config from server
+            elif command == 'cup':
+                return self.send_config_request(event.data)
 
-        # send current device config to server
-        elif command == 'sup':
-            conf = self.get_current_config()
-            # send only required fields
-            if event.data:
-                filtered = {k:v for k,v in conf.items() if k in event.data}
-                if filtered:
-                    conf = filtered
-            return self.send_config(conf)
+            # send current device config to server
+            elif command == 'sup':
+                conf = self.get_current_config()
+                # send only required fields
+                if event.data:
+                    filtered = {k:v for k,v in conf.items() if k in event.data}
+                    if filtered:
+                        conf = filtered
+                return self.send_config(conf)
 
-        # send data to server directly without local db update
-        elif command == 'info':
-            logging.debug(f'sending {event.data} to server')
-            return self.send_message(event.data)
+            # send data to server directly without local db update
+            elif command == 'info':
+                self.logger.debug(f'sending {event.data} to server')
+                return self.send_message(event.data)
 
-        # input received, update local config, send to server
-        elif command == 'input':
-            logging.debug(f'new input: {event.data}')
-            if event.data:
-                self.device.config.save(event.data)
-                return self.send_config(event.data)
+            # input received, update local config, send to server
+            elif command == 'input':
+                self.logger.debug(f'new input: {event.data}')
+                if event.data:
+                    self.device.config.save(event.data)
+                    return self.send_config(event.data)
+                else:
+                    self.logger.error(f'missing data from event: {event}')
+
+            # reload device with current local config
+            elif command in ('reload', 'reset'):
+                self.logger.debug('RESET event, reloading device')
+                return self.device.state_reload()
+
             else:
-                logging.error(f'missing data from event: {event}')
-
-        # reload device with current local config
-        elif command in ('reload', 'reset'):
-            logging.debug('RESET event, reloading device')
-            return self.device.state_reload()
-
-        else:
-            logging.error(f'bad event {event}')
+                self.logger.error(f'bad event {event}')
+        except Exception as e:
+            raise Exception(f'[E] MAIN context: {e}')
 
     def manage_mqtt(self, event):
         """Manage event from MQTT based on command
@@ -192,8 +182,8 @@ class EventContext(BaseContext):
                 self.q_int.put(event)
             else:
                 raise Exception(f"unrecognized command: {command}")
-        except Exception:
-            raise
+        except Exception as e:
+            raise Exception(f"[E] MQTT context: {e}")
 
     def send_message(self, data):
         """ INFO packet """
@@ -207,7 +197,7 @@ class EventContext(BaseContext):
         """ SUP packet """
         try:
             if not data:
-                raise Exception("empty data")
+                raise Exception("cannot send empty data")
             if not isinstance(data, dict):
                 raise Exception(f'data is not a dict: {data}')
 
@@ -220,7 +210,7 @@ class EventContext(BaseContext):
                             datahold=data)
             self.q_ext.put(packet.encode())
         except Exception as e:
-            logging.exception(f"error in context config send - {e} \n {self}")
+            raise Exception(f"[E] config send - {e} \n {self}")
 
     def send_config_request(self, keys=None):
         """ CUP packet """
@@ -243,9 +233,9 @@ class EventContext(BaseContext):
         response = 'ACK'
         try:
             self.device.config.save(event.data)
-        except Exception:
+        except Exception as e:
             response = 'NACK'
-            logging.exception('cannot apply new config')
+            raise Exception(f'cannot apply new config: {e}')
         finally:
             return self.confirm_update(task_id, response)
 
@@ -287,7 +277,7 @@ class Router(Thread):
                 event = self.q_int.get()
 
                 if event.type not in self.managed_events:
-                    raise Exception('cannot determine message type for:\n{}'.format(event))
+                    raise Exception(f"cannot determine message type for:\n{event}")
                 elif event.type == "exit":
                     self.q_ext.put(event)
                     return self.stop()
@@ -295,9 +285,9 @@ class Router(Thread):
                 with EventContext(self.config) as context:
                     context.absorb(event)
 
-            except Exception:
-                self.logger.exception('exception in manager context:')
-                self.stop()
+            except Exception as e:
+                print(f"{e}")
+                self.logger.exception()
 
     def stop(self):
         """ Full stop """
