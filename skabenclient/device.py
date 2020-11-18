@@ -82,5 +82,15 @@ class BaseDevice:
         if timer and timer <= now:
             return timer
 
+    @property
+    def state(self):
+        return self.config.data
+
+    def save(self, data=None):
+        return self.config.save(data)
+
+    def load(self):
+        return self.config.load()
+
     def __str__(self):
         return f"Basic Device <{self.system}>"

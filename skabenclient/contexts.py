@@ -47,7 +47,12 @@ class BaseContext:
         """ Read previous timestamp value from 'ts' file """
         with open(self.timestamp_fname, 'r') as fh:
             t = fh.read().rstrip()
-            return int(t) or 0
+            try:
+                return int(t)
+            except Exception:
+                t = 0
+                self.rewrite_timestamp(t)
+                return t
 
     def rewrite_timestamp(self, new_ts):
         """ Write timestamp value to file 'ts' """
@@ -57,9 +62,9 @@ class BaseContext:
 
     def get_current_config(self):
         """ load current device config """
-        current = self.device.config.data
+        current = self.device.state
         if not current:
-            current = self.device.config.load()
+            current = self.device.load()
         return current
 
     def confirm_update(self, task_id, packet_type='ACK'):
@@ -128,7 +133,7 @@ class EventContext(BaseContext):
             elif command == 'input':
                 self.logger.debug(f'new input: {event.data}')
                 if event.data:
-                    self.device.config.save(event.data)
+                    self.device.save(event.data)
                     return self.send_config(event.data)
                 else:
                     self.logger.error(f'missing data from event: {event}')
@@ -232,7 +237,7 @@ class EventContext(BaseContext):
         task_id = event.data.get('task_id', '12345')
         response = 'ACK'
         try:
-            self.device.config.save(event.data)
+            self.device.save(event.data)
         except Exception as e:
             response = 'NACK'
             raise Exception(f'cannot apply new config: {e}')

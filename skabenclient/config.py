@@ -1,10 +1,12 @@
 import os
 import yaml
+import asyncio
 import logging
+import concurrent.futures
 import multiprocessing as mp
 from skabenclient.helpers import get_mac, get_ip, FileLock
 from skabenclient.logger import make_local_loggers, make_network_logger
-from skabenclient.loaders import get_yaml_loader
+from skabenclient.loaders import get_yaml_loader, HTTPLoader
 
 import collections.abc
 
@@ -242,3 +244,91 @@ class DeviceConfig(Config):
     def current(self):
         """ Get current config """
         return self.data
+
+
+class DeviceConfigExtended(DeviceConfig):
+    """device config with extended API support"""
+
+    assets = {}
+    asset_dirs = []
+
+    def __init__(self, config_path, system_config):
+        self.system = system_config
+        self.make_asset_dirs()
+        super().__init__(config_path)
+
+    def make_asset_dirs(self) -> dict:
+        for dirname in self.asset_dirs:
+            dirpath = os.path.join(self.system.root, self.system.get('assets_path'), dirname)
+            if not os.path.exists(dirpath):
+                os.mkdir(dirpath)
+            self.assets[dirname] = dirpath
+        return self.assets
+
+    def parse_files(self, files: dict) -> dict:
+        if not self.assets:
+            raise Exception("asset directories was not created, run DeviceConfig.make_asset_dirs(SystemConfig) first!")
+        exists = self.data.get('files')
+        if files:
+            to_be_download = {}
+            for name, url in files.items():
+                if name in exists:
+                    continue
+                file_type, orig_name = url.split("/")[-2:]
+                try:
+                    local_dir = self.assets[file_type]
+                except ValueError:
+                    raise Exception(f"no local directory was created for `{file_type}` type of files")
+
+                to_be_download.update({
+                    name: {
+                        "local_path":  os.path.join(local_dir, orig_name),
+                        "orig_name": orig_name,
+                        "name": name,
+                        "url": url,
+                        "loaded": False
+                    }
+                })
+            self.update({"assets": to_be_download})
+            return to_be_download
+
+    def get_file(self, file_data: dict) -> dict:
+        with HTTPLoader(self.system) as loader:
+            path = loader.get_file(file_data["url"], file_data["local_path"])
+            return {file_data["name"]: path}
+
+    @staticmethod
+    def set_file_loaded(target, name):
+        target.update({
+            "assets": {
+                name: {
+                    "loaded": True
+                }
+            }
+        })
+        return target
+
+    async def download(self, file_list: dict) -> dict:
+        result = {}
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.system.get("max_workers", 3))
+        loop = asyncio.get_event_loop()
+        for item in file_list.values():
+            await loop.run_in_executor(executor, self.get_file, item)
+            self.set_file_loaded(result, item["name"])
+        return result
+
+    def get_files_async(self, file_list: dict):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(self.download(file_list))
+
+    def get_files_sync(self, file_list: dict):
+        result = {}
+        for item in file_list.values():
+            if self.get_file(item):
+                self.set_file_loaded(result, item["name"])
+        return result
+
+    def parse_json(self, url: str) -> dict:
+        with HTTPLoader(self.system) as loader:
+            return loader.get_json(url)

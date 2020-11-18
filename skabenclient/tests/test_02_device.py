@@ -39,7 +39,7 @@ def test_device_input_new(get_device, default_config, payload):
     event = device.state_update({**default_config('dev'), **payload})
     payload_and_uid = {**payload, **{'uid': syscfg.get('uid')}}
     test_event = make_event('device', 'input', payload_and_uid)
-    device.config.save(payload)
+    device.save(payload)
 
     assert device.config.data == {**devcfg.data, **payload}, 'user input not saved'
     assert event.type == test_event.type, 'bad event type'
@@ -52,7 +52,7 @@ def test_device_input_exist(get_device, default_config, payload):
     device, devcfg, syscfg = get_device
     device.config.data = payload
     event = device.state_update(payload)
-    device.config.save(payload)
+    device.save(payload)
     assert device.config.data == {**devcfg.data, **payload}, 'user input not saved'
     assert event is None, "event created when should not"
 

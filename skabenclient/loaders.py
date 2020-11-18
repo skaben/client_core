@@ -1,7 +1,6 @@
 import os
 import time
 import yaml
-import json
 import logging
 import pygame as pg
 import pygame.mixer as mixer
@@ -224,7 +223,7 @@ class HTTPLoader:
         finally:
             return result
 
-    def get_file(self, remote_url: str, local_path: str) -> Union[str, bool]:
+    def get_file(self, remote_url: str, local_path: str) -> str:
         if os.path.isdir(local_path):
             file_name = self.parse_url(remote_url)['file']
             local_path = os.path.join(local_path, file_name)
