@@ -197,8 +197,6 @@ def test_config_system_logger_external(get_config, default_config, monkeypatch, 
 
 def test_config_device_init(get_config, monkeypatch):
     """ Test creates DeviceConfig """
-    # WARN: this monkeypatching hardcoded on base_config keys
-    # setattr for passing DeviceConfig.read() consistency check
     monkeypatch.setattr(DeviceConfig, 'minimal_essential_conf', {'int': 1})
     cfg = get_config(DeviceConfig, base_config)
 
@@ -208,8 +206,6 @@ def test_config_device_init(get_config, monkeypatch):
 
 def test_config_device_init_with_defaults(get_config, monkeypatch):
     """ Test creates DeviceConfig with minimal essential conf """
-    # WARN: this monkeypatching hardcoded on base_config keys
-    # setattr for passing DeviceConfig.read() consistency check
     notbase_config = {'not_presented': 1}
     monkeypatch.setattr(DeviceConfig, 'minimal_essential_conf', notbase_config)
     cfg = get_config(DeviceConfig, base_config)

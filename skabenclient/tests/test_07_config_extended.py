@@ -16,24 +16,6 @@ if not os.path.exists(LOCAL_DIR):
     os.mkdir(LOCAL_DIR)
 
 
-EXAMPLE = {
-        "file_list": {
-            "MqmVaQ7L": "/test/snd.ogg",
-            "MqmVaQ7F": "/sound/snd.ogg",
-            "MqmVaQ7R": "/another/snd.ogg",
-        },
-        "modes_normal": [
-            "/api/workmode/1/"
-        ],
-        "modes_extended": [
-            "/api/workmode/2/"
-        ],
-        "timestamp": 1605712087,
-        "powered": True,
-        "blocked": False,
-        "hacked": False
-}
-
 def read_bin(fpath):
     with open(fpath, 'rb') as fh:
         return fh.read()
@@ -135,7 +117,7 @@ def test_files_parse_normal(get_extended_config, get_file_vars):
 
     assert device.asset_paths
 
-    result = device.parse_files({"file_list": {key: url}})
+    result = device.parse_files([{key: url}])
     pick = result.get(key)
 
     assert pick
@@ -152,7 +134,7 @@ def test_files_parse_local_dir_not_exists(get_extended_config, get_file_vars):
     dirname = 'non_exists'
 
     device = get_extended_config
-    device.parse_files({"file_list": {key: url}})
+    device.parse_files([{key: url}])
     with pytest.raises(Exception) as exc:
         assert str(exc.value) == f"no local directory was created for `{dirname}` type of files"
 
@@ -166,8 +148,8 @@ def test_files_parse_local_file_asset_exists(get_extended_config, get_file_vars)
     assets = device.data['assets']
     test_dict = {"loaded": True}
     assets[key] = test_dict
+    device.parse_files([{key: url}])
 
-    device.parse_files({"file_list": {key: url}})
     assert assets[key]
     assert not assets[key].get("url")
 
@@ -326,3 +308,4 @@ def test_files_get_async(live_server, get_extended_config):
         assert remote_data == read_bin(local_file)
 
     live_server.stop()
+
