@@ -20,7 +20,7 @@ def read_bin(fpath):
         return fh.read()
 
 
-def test_add_endpoint_to_live_server(live_server, stop_liveserver):
+def test_add_endpoint_to_live_server(live_server):
     @live_server.app.route('/test-endpoint')
     def test_endpoint():
         return 'got it', 200

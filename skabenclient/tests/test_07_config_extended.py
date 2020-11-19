@@ -117,7 +117,7 @@ def test_files_parse_normal(get_extended_config, get_file_vars):
 
     assert device.asset_paths
 
-    result = device.parse_files([{key: url}])
+    result = device.parse_files({key: url})
     pick = result.get(key)
 
     assert pick

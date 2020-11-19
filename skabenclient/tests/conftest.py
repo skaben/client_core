@@ -18,6 +18,7 @@ def get_root():
 def _iface():
     stream = os.popen(f"ip route | grep 'default' | sed -nr 's/.*dev ([^\ ]+).*/\\1/p'")
     iface_name = stream.read()
+    stream.close()
     return iface_name.rstrip()
 
 

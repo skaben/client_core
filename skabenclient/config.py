@@ -270,16 +270,16 @@ class DeviceConfigExtended(DeviceConfig):
             self.asset_paths[dirname] = dirpath
         return self.asset_paths
 
-    def parse_files(self, files: List[dict]) -> dict:
+    def parse_files(self, files: dict) -> dict:
         if not self.asset_paths:
             raise Exception("asset directories was not created, run DeviceConfig.make_asset_dirs(SystemConfig) first!")
 
-        if files and isinstance(files, (list, tuple)):
+        if files and isinstance(files, dict):
             to_be_download = {}
             assets = self.data.get('assets', {})
 
-            for file_data in files:
-                hash, url = list(file_data.items())[0]
+            for file_data in list(files.items()):
+                hash, url = file_data
                 exists = assets.get(hash)
                 if exists and exists.get('loaded') is True:
                     continue
