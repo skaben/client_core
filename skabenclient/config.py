@@ -249,12 +249,15 @@ class DeviceConfig(Config):
 class DeviceConfigExtended(DeviceConfig):
     """device config with extended API support"""
 
-    assets = {}
-    asset_dirs = []
+    asset_paths = {}  # file details with name as key
+    asset_dirs = []  # list of permitted storage directories
+
+    minimal_essential_conf = {
+        "assets": {}
+    }
 
     def __init__(self, config_path, system_config):
         self.system = system_config
-        self.make_asset_dirs()
         super().__init__(config_path)
 
     def make_asset_dirs(self) -> dict:
@@ -262,29 +265,36 @@ class DeviceConfigExtended(DeviceConfig):
             dirpath = os.path.join(self.system.root, self.system.get('assets_path'), dirname)
             if not os.path.exists(dirpath):
                 os.mkdir(dirpath)
-            self.assets[dirname] = dirpath
-        return self.assets
+            self.asset_paths[dirname] = dirpath
+        return self.asset_paths
 
     def parse_files(self, files: dict) -> dict:
-        if not self.assets:
+        if not self.asset_paths:
             raise Exception("asset directories was not created, run DeviceConfig.make_asset_dirs(SystemConfig) first!")
-        exists = self.data.get('files')
-        if files:
+
+        if files and isinstance(files, dict):
             to_be_download = {}
-            for name, url in files.items():
-                if name in exists:
+            assets = self.data.get('assets', {})
+
+            for file_data in files.values():
+                hash, url = list(file_data.items())[0]
+                exists = assets.get(hash)
+                if exists and exists.get('loaded') is True:
                     continue
+
                 file_type, orig_name = url.split("/")[-2:]
+                if len(orig_name.split(".")) < 2:
+                    raise NotImplementedError("URI without file extension not supported")
+
                 try:
-                    local_dir = self.assets[file_type]
+                    local_dir = self.asset_paths[file_type]
                 except ValueError:
                     raise Exception(f"no local directory was created for `{file_type}` type of files")
 
                 to_be_download.update({
-                    name: {
-                        "local_path":  os.path.join(local_dir, orig_name),
-                        "orig_name": orig_name,
-                        "name": name,
+                    hash: {
+                        "local_path": os.path.join(local_dir, orig_name),
+                        "hash": hash,
                         "url": url,
                         "loaded": False
                     }
@@ -295,39 +305,35 @@ class DeviceConfigExtended(DeviceConfig):
     def get_file(self, file_data: dict) -> dict:
         with HTTPLoader(self.system) as loader:
             path = loader.get_file(file_data["url"], file_data["local_path"])
-            return {file_data["name"]: path}
+            return {file_data["hash"]: path}
 
-    @staticmethod
-    def set_file_loaded(target, name):
-        target.update({
+    def set_file_loaded(self, name):
+        self.update({
             "assets": {
                 name: {
                     "loaded": True
                 }
             }
         })
-        return target
 
-    async def download(self, file_list: dict) -> dict:
-        result = {}
+    async def download(self, file_list: list) -> dict:
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.system.get("max_workers", 3))
         loop = asyncio.get_event_loop()
-        for item in file_list.values():
+        for item in file_list:
             await loop.run_in_executor(executor, self.get_file, item)
-            self.set_file_loaded(result, item["name"])
-        return result
+            self.set_file_loaded(item["name"])
+        return self.data["assets"]
 
-    def get_files_async(self, file_list: dict):
+    def get_files_async(self, file_list: list):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         return loop.run_until_complete(self.download(file_list))
 
-    def get_files_sync(self, file_list: dict):
-        result = {}
-        for item in file_list.values():
+    def get_files_sync(self, file_list: list):
+        for item in file_list:
             if self.get_file(item):
-                self.set_file_loaded(result, item["name"])
-        return result
+                self.set_file_loaded(item["name"])
+        return self.data["assets"]
 
     def parse_json(self, url: str) -> dict:
         with HTTPLoader(self.system) as loader:

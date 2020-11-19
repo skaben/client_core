@@ -109,6 +109,10 @@ def default_config():
             'string': 'abcd',
             'list': [1, 'str', 0.1]}
 
+    _real = {
+        'closed': True,
+    }
+
     switch = {
         'sys': _sys,
         'dev': _dev
