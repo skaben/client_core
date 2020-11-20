@@ -1,6 +1,7 @@
 import os
 import time
 import yaml
+import json
 import logging
 import pygame as pg
 import pygame.mixer as mixer
@@ -238,7 +239,7 @@ class HTTPLoader:
                     fh.write(data)
             return local_path
         except FileNotFoundError:
-            raise Exception(f"ff")
+            raise
         except Exception as e:
             raise Exception(f'cannot retrieve {remote_url}: {e}')
 
