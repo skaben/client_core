@@ -237,6 +237,8 @@ class HTTPLoader:
                 for data in response.iter_content():
                     fh.write(data)
             return local_path
+        except FileNotFoundError:
+            raise Exception(f"ff")
         except Exception as e:
             raise Exception(f'cannot retrieve {remote_url}: {e}')
 
