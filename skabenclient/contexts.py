@@ -178,10 +178,14 @@ class EventContext(BaseContext):
                                  timestamp=self.timestamp)
                 self.q_ext.put(packet.encode())
             elif command == 'CUP':
+                if not datahold:
+                    raise Exception(f"empty datahold in CUP packet: {event}")
                 # update local configuration from packet data
                 event = make_event('device', 'update', datahold)
                 self.q_int.put(event)
             elif command == 'SUP':
+                if not datahold:
+                    raise Exception(f"empty datahold in SUP packet: {event}")
                 # send local configuration to server (filtered by field list)
                 event = make_event('device', 'sup', datahold.get('fields'))
                 self.q_int.put(event)
@@ -292,7 +296,7 @@ class Router(Thread):
 
             except Exception as e:
                 print(f"{e}")
-                self.logger.exception()
+                self.logger.exception("")
 
     def stop(self):
         """ Full stop """
