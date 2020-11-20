@@ -18,6 +18,7 @@ def get_root():
 def _iface():
     stream = os.popen(f"ip route | grep 'default' | sed -nr 's/.*dev ([^\ ]+).*/\\1/p'")
     iface_name = stream.read()
+    stream.close()
     return iface_name.rstrip()
 
 
@@ -108,6 +109,10 @@ def default_config():
             'float': 0.1,
             'string': 'abcd',
             'list': [1, 'str', 0.1]}
+
+    _real = {
+        'closed': True,
+    }
 
     switch = {
         'sys': _sys,

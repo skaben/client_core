@@ -9,6 +9,7 @@ class ReportHandler(logging.handlers.QueueHandler):
 
     def __init__(self, queue):
         super().__init__(queue)
+        self.queue = queue
 
     def prepares(self, record):
         return record

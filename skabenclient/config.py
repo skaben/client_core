@@ -1,10 +1,15 @@
 import os
 import yaml
+import asyncio
 import logging
+import concurrent.futures
 import multiprocessing as mp
+import shutil
+from typing import Union, List
+
 from skabenclient.helpers import get_mac, get_ip, FileLock
 from skabenclient.logger import make_local_loggers, make_network_logger
-from skabenclient.loaders import get_yaml_loader
+from skabenclient.loaders import get_yaml_loader, HTTPLoader
 
 import collections.abc
 
@@ -242,3 +247,117 @@ class DeviceConfig(Config):
     def current(self):
         """ Get current config """
         return self.data
+
+
+class DeviceConfigExtended(DeviceConfig):
+    """device config with extended API support"""
+
+    minimal_essential_conf = {
+        "assets": {}
+    }
+
+    asset_paths = {}  # directory paths by file types
+
+    def __init__(self, config_path, system_config):
+        self.system = system_config
+        self._update_paths(self.system.get("asset_types", []))
+        self.asset_root = os.path.join(self.system.root, self.system.get('assets_root'))
+        if not os.path.exists(self.asset_root):
+            os.mkdir(self.asset_root)
+        super().__init__(config_path)
+
+    def make_asset_paths(self, asset_dirs: Union[list, bool] = None) -> dict:
+        self._update_paths(asset_dirs)
+        for dirname in self.asset_paths:
+            dirpath = os.path.join(self.asset_root, dirname)
+            if not os.path.exists(dirpath):
+                os.mkdir(dirpath)
+            self.asset_paths[dirname] = dirpath
+        return self.asset_paths
+
+    def clear_asset_paths(self):
+        try:
+            for dir in self.asset_paths.values():
+                shutil.rmtree(dir)
+            self.asset_paths = {}
+        except Exception as e:
+            raise Exception(f"cannot remove assets dir: {e}")
+
+    def _update_paths(self, dirs: list) -> dict:
+        if dirs and isinstance(dirs, (list, tuple)):
+            self.asset_paths.update({k: "" for k in dirs})
+            return self.asset_paths
+
+    def parse_files(self, files: dict) -> dict:
+        if not self.asset_paths:
+            raise Exception("asset directories was not created, run DeviceConfig.make_asset_paths(asset_dirs) first!")
+
+        if files and isinstance(files, dict):
+            to_be_download = {}
+            assets = self.get('assets', {})
+
+            for file_data in list(files.items()):
+                hash, url = file_data
+                exists = assets.get(hash)
+                if exists and exists.get('loaded') is True:
+                    continue
+
+                file_type, orig_name = url.split("/")[-2:]
+                if len(orig_name.split(".")) < 2:
+                    raise NotImplementedError("URI without file extension not supported")
+
+                local_dir = self.asset_paths.get(file_type)
+                if not local_dir:
+                    raise Exception(f"no local directory was created for `{file_type}` type of files")
+
+                to_be_download.update({
+                    hash: {
+                        "local_path": os.path.join(local_dir, orig_name),
+                        "hash": hash,
+                        "url": url,
+                        "file_type": file_type,
+                        "loaded": False
+                    }
+                })
+            self.update({"assets": to_be_download})
+            return to_be_download
+
+    def get_file(self, file_data: dict) -> dict:
+        with HTTPLoader(self.system) as loader:
+            path = loader.get_file(file_data["url"], file_data["local_path"])
+            return {file_data["hash"]: path}
+
+    async def download(self, files: List[dict]) -> dict:
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.system.get("max_workers", 3))
+        loop = asyncio.get_event_loop()
+        for item in files:
+            await loop.run_in_executor(executor, self.get_file, item)
+            self.set_file_loaded(item["hash"])
+        return self.data["assets"]
+
+    def get_files_async(self, files: List[dict]):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(self.download(files))
+
+    def get_files_sync(self, files: List[dict]):
+        for item in files:
+            if self.get_file(item):
+                self.set_file_loaded(item["hash"])
+        return self.data["assets"]
+
+    def set_file_loaded(self, _hash: str):
+        self.update({
+            "assets": {
+                _hash: {
+                    "loaded": True
+                }
+            }
+        })
+
+    def get_json(self, url: str) -> dict:
+        with HTTPLoader(self.system) as loader:
+            response = loader.get_json(url)
+            if response == {}:
+                raise Exception(f"empty response, {url} didn't return valid JSON")
+            return response

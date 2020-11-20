@@ -224,7 +224,7 @@ class HTTPLoader:
         finally:
             return result
 
-    def get_file(self, remote_url: str, local_path: str) -> Union[str, bool]:
+    def get_file(self, remote_url: str, local_path: str) -> str:
         if os.path.isdir(local_path):
             file_name = self.parse_url(remote_url)['file']
             local_path = os.path.join(local_path, file_name)
@@ -238,6 +238,8 @@ class HTTPLoader:
                 for data in response.iter_content():
                     fh.write(data)
             return local_path
+        except FileNotFoundError:
+            raise
         except Exception as e:
             raise Exception(f'cannot retrieve {remote_url}: {e}')
 

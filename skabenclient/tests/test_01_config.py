@@ -67,6 +67,34 @@ def test_config_update(get_config):
     assert cfg.data.get('name') == "new_name", "config was not updated"
 
 
+def test_config_update_nested(get_config):
+    val = 'value'
+
+    before = {'nested': val}
+    after = {'nested_two': val*2}
+
+    nested = {'test': {'main': before}}
+    new_nested = {'test': {'main': after}}
+
+    cfg = get_config(Config, nested)
+    cfg.update(new_nested)
+
+    assert cfg.data['test']['main'] == {**before, **after}, 'not updated'
+    assert cfg.data['test']['main']['nested'] == val, 'nested update has failed'
+
+
+def test_config_update_nested_force(get_config):
+    val = 'value'
+    nested = {'test': {'main': {'nested': val}}}
+    new_nested = {'test': {'main': {'nested_two': val}}, 'FORCE': True}
+
+    cfg = get_config(Config, nested)
+    cfg.update(new_nested)
+
+    assert not cfg.data['test']['main'].get('nested')
+    assert cfg.data['test']['main'].get('nested_two')
+
+
 @pytest.mark.parametrize('conf_obj', (Config, SystemConfig))
 def test_config_file_empty(get_empty_config, monkeypatch, get_root, conf_obj):
     """ Test config write default """
@@ -103,6 +131,7 @@ def test_config_system_init_base(get_config, default_config):
     conf_keys.sort()
 
     assert conf_keys == test_keys, 'inconsistent config keys'
+
 
 def test_config_system_logger(get_config, default_config):
     """ Test creates SystemConfig logger """
@@ -168,8 +197,6 @@ def test_config_system_logger_external(get_config, default_config, monkeypatch, 
 
 def test_config_device_init(get_config, monkeypatch):
     """ Test creates DeviceConfig """
-    # WARN: this monkeypatching hardcoded on base_config keys
-    # setattr for passing DeviceConfig.read() consistency check
     monkeypatch.setattr(DeviceConfig, 'minimal_essential_conf', {'int': 1})
     cfg = get_config(DeviceConfig, base_config)
 
@@ -179,8 +206,6 @@ def test_config_device_init(get_config, monkeypatch):
 
 def test_config_device_init_with_defaults(get_config, monkeypatch):
     """ Test creates DeviceConfig with minimal essential conf """
-    # WARN: this monkeypatching hardcoded on base_config keys
-    # setattr for passing DeviceConfig.read() consistency check
     notbase_config = {'not_presented': 1}
     monkeypatch.setattr(DeviceConfig, 'minimal_essential_conf', notbase_config)
     cfg = get_config(DeviceConfig, base_config)
