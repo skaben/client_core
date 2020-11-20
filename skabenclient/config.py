@@ -261,7 +261,7 @@ class DeviceConfigExtended(DeviceConfig):
     def __init__(self, config_path, system_config):
         self.system = system_config
         self._update_paths(self.system.get("asset_types", []))
-        self.asset_root = os.path.join(self.system.root, self.system.get('assets_root'))
+        self.asset_root = os.path.join(self.system.root, self.system.get('asset_root'))
         if not os.path.exists(self.asset_root):
             os.mkdir(self.asset_root)
         super().__init__(config_path)

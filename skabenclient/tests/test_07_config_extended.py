@@ -26,13 +26,13 @@ def read_bin(fpath):
 
 
 @pytest.fixture
-def assets_root(get_config, default_config, request):
+def asset_root(get_config, default_config, request):
 
     def _wrap(system_config):
 
         system_config = get_config(SystemConfig, default_config('sys'))
         system_config.root = LOCAL_DIR
-        system_config.data['assets_root'] = ASSETS_ROOT
+        system_config.data['asset_root'] = ASSETS_ROOT
         return system_config
 
     return _wrap
@@ -52,11 +52,11 @@ def remove_assets():
 
 
 @pytest.fixture
-def get_extended_config(monkeypatch, get_config, default_config, assets_root):
+def get_extended_config(monkeypatch, get_config, default_config, asset_root):
     system_config = get_config(SystemConfig, default_config('sys'))
     system_config.root = LOCAL_DIR
     # create assets
-    system_config = assets_root(system_config)
+    system_config = asset_root(system_config)
     dev_config_base = get_config(DeviceConfig, default_config('dev'))  # create for config path
     # get extended from config path, make assets subdirectories on init
     monkeypatch.setattr(DeviceConfigExtended, 'asset_paths', ASSET_PATHS)
