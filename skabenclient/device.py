@@ -13,7 +13,7 @@ class BaseDevice:
     config_class = DeviceConfig
     timers = {}
 
-    def __init__(self, app_config, device_config):
+    def __init__(self, app_config: SystemConfig, device_config: DeviceConfig):
         if not isinstance(app_config, SystemConfig):
             raise Exception(f'app_config is not a SystemConfig, but {type(app_config)} instead')
         if not isinstance(device_config, self.config_class):
@@ -28,22 +28,24 @@ class BaseDevice:
         self.config.load()  # load and update current running conf
 
     def run(self):
+        """start application device module"""
         print('application is starting...')
         self.logger.debug(f'{self} starting with device config: \n {self.config}')
         reload_event = make_event('device', 'reload')
         self.q_int.put(reload_event)
 
     def stop(self):
+        """stop application device module"""
         print('device is stopping...')
         self.logger.debug(f"stopping device {self}")
         end_event = make_event("exit")
         self.q_int.put(end_event)
 
     def state_update(self, data: dict):
-        """ Update device configuration from user actions
+        """Update device configuration from user actions
 
-            When new data from user actions received, check current config and if changed,
-            send new event to inner event queue for local config change.
+           When new data from user actions received, check current config and if changed,
+           send new event to inner event queue for local config change.
         """
         if not isinstance(data, dict):
             self.logger.error('message type not dict: {}\n{}'.format(type(data), data))
@@ -61,16 +63,17 @@ class BaseDevice:
             return event
 
     def state_reload(self):
-        """ Re-read and apply device saved state """
+        """Re-read and apply device saved state"""
         return self.config.load()
 
     def send_message(self, data: dict):
-        """ Send message to server """
+        """Send message to server"""
         event = make_event('device', 'info', data)
         self.q_int.put(event)
         return event
 
     def new_timer(self, start: int, count: int, name: str) -> str:
+        """Assign timer with given start time, duration and name"""
         if int(count) > 0:
             timer = start + count
             self.timers.update({name: timer})
@@ -78,6 +81,7 @@ class BaseDevice:
             return self.timers[name]
 
     def check_timer(self, name: str, now: int) -> bool:
+        """Check if named timer has already expired"""
         timer = self.timers.get(name)
         if timer and timer <= now:
             return timer
