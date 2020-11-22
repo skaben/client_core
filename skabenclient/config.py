@@ -7,6 +7,7 @@ import multiprocessing as mp
 import shutil
 from typing import Union, List, TextIO, Any, Optional
 
+
 from skabenclient.helpers import get_mac, get_ip, FileLock
 from skabenclient.logger import make_local_loggers, make_network_logger
 from skabenclient.loaders import get_yaml_loader, HTTPLoader
@@ -258,6 +259,7 @@ class DeviceConfigExtended(DeviceConfig):
         self.system = system_config
         self._update_paths(self.system.get("asset_types", []))
         self.asset_root = os.path.join(self.system.root, self.system.get('asset_root'))
+
         if not os.path.exists(self.asset_root):
             os.mkdir(self.asset_root)
         super().__init__(config_path)

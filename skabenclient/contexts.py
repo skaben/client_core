@@ -56,6 +56,7 @@ class BaseContext:
                 self.rewrite_timestamp(t)
                 return t
 
+
     def rewrite_timestamp(self, new_ts: Union[str, int]) -> int:
         """Write timestamp value to file"""
         with open(self.timestamp_fname, 'w') as fh:
@@ -66,6 +67,7 @@ class BaseContext:
         """load current device config
            TODO: check usage of this method! YAGNI
         """
+
         current = self.device.state
         if not current:
             current = self.device.load()
