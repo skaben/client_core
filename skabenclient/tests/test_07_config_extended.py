@@ -27,7 +27,6 @@ def read_bin(fpath):
 
 @pytest.fixture
 def asset_root(get_config, default_config, request):
-
     def _wrap(system_config):
 
         system_config = get_config(SystemConfig, default_config('sys'))
