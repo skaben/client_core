@@ -1,9 +1,13 @@
 import json
 import time
 import logging
+
+from typing import Any
 from multiprocessing import Process
 import paho.mqtt.client as mqtt
+
 from skabenclient.helpers import make_event
+from skabenclient.config import SystemConfig
 
 
 class MQTTError(Exception):
@@ -14,17 +18,17 @@ class MQTTError(Exception):
         message -- explanation of the error
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         self.message = message
 
 
 class MQTTAuthError(MQTTError):
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
 class MQTTProtocolError(MQTTError):
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
@@ -45,7 +49,7 @@ class MQTTClient(Process):
     subscriptions_info = ''
     default_timeout = 2
 
-    def __init__(self, config):
+    def __init__(self, config: SystemConfig):
         super().__init__()
 
         self.event = dict()
@@ -161,7 +165,7 @@ class MQTTClient(Process):
         finally:
             self.client.disconnect(self.client, 0)
 
-    def reconnect(self, rc):
+    def reconnect(self, rc: int):
         try:
             logging.warning(f'unexpected disconnect (code {rc}).\ntrying auto-reconnect...')
             self.is_connected = False
@@ -176,9 +180,9 @@ class MQTTClient(Process):
         except Exception:
             raise
 
-    def on_connect(self, client, userdata, flags, rc):
-        """
-            On connect to broker
+    def on_connect(self, client: mqtt.Client, userdata: Any, flags, rc: int):
+        """On connect to broker
+            TODO: type annotation for userdata
         """
 
         if 6 > rc > 0:
@@ -198,7 +202,10 @@ class MQTTClient(Process):
         request_config_event = make_event("device", "cup")
         self.q_int.put(request_config_event)
 
-    def on_disconnect(self, client, userdata, rc):
+    def on_disconnect(self, client: mqtt.Client, userdata, rc):
+        """On disconnect from broker
+            TODO: type annotation for userdata
+        """
         logging.info('disconnected from broker')
         rc = int(rc)
         if rc != 0:
@@ -207,11 +214,10 @@ class MQTTClient(Process):
             self.running = False
             self.client.loop_stop(force=True)
 
-    def on_message(self, client, userdata, msg):
-        """
-            Message from MQTT broker received
-
-            receive message as (str, b'{}'), return dict
+    def on_message(self, client: mqtt.Client, userdata, msg):
+        """Message from MQTT broker received
+           receive message as (str, b'{}'), return dict
+           TODO: type annotations for userdata, msg
         """
         print('[RECEIVE] {}:{}'.format(msg.topic, msg.payload))
         logging.debug('RECEIVE: {}:{}'.format(msg.topic, msg.payload))

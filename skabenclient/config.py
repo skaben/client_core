@@ -5,7 +5,8 @@ import logging
 import concurrent.futures
 import multiprocessing as mp
 import shutil
-from typing import Union, List
+from typing import Union, List, TextIO, Any, Optional
+
 
 from skabenclient.helpers import get_mac, get_ip, FileLock
 from skabenclient.logger import make_local_loggers, make_network_logger
@@ -29,7 +30,7 @@ class Config:
     not_stored_keys = list()  # fields should not be stored in .yml
     minimal_essential_conf = dict()  # essential config
 
-    def __init__(self, config_path):
+    def __init__(self, config_path: str):
         self.data = dict()
         self.config_path = config_path
         if not config_path:
@@ -37,8 +38,8 @@ class Config:
         current = self.read()
         self.update(current)
 
-    def _yaml_load(self, target):
-        """ Loads yaml with correct Loader """
+    def _yaml_load(self, target: TextIO) -> dict:
+        """Loads yaml from given file"""
         result = yaml.load(target, Loader=ExtendedLoader)
         if not result:
             raise EOFError(f"{target} cannot be loaded")
@@ -53,7 +54,7 @@ class Config:
         except Exception:
             raise
 
-    def write(self, data=None, mode='w'):
+    def write(self, data: dict = None, mode: str = 'w'):
         """ Writes to config file """
         if not data:
             data = self.data
@@ -66,16 +67,16 @@ class Config:
         except Exception:
             raise
 
-    def get(self, key, arg=None):
-        """ Get compatibility wrapper """
+    def get(self, key: str, arg: Any = None) -> Any:
+        """Get compatibility wrapper"""
         return self.data.get(key, arg)
 
-    def set(self, key, val):
-        """ Set compatibility wrapper """
+    def set(self, key: str, val: str) -> dict:
+        """Set compatibility wrapper"""
         return self.update({key: val})
 
-    def update(self, payload: dict):
-        """ Updates local namespace from payload with basic filtering """
+    def update(self, payload: dict) -> dict:
+        """Updates local namespace from payload with basic filtering"""
         update_target = self.data
         # destructive update
         if payload.get("FORCE"):
@@ -85,6 +86,7 @@ class Config:
         return self.data
 
     def _update_nested(self, target: dict, update: _mapping) -> dict:
+        """Update nested dictionaries"""
         for k, v in update.items():
             try:
                 if isinstance(v, _mapping):
@@ -102,18 +104,15 @@ class Config:
                                 f"KEY: {k} ({type(target)}) updated by VAL: {v} \n {exc}")
         return dict(target)
 
-    def _filter(self, payload):
-        """ Filter keys starting with underscore and by filtered keys list """
-        cfg = {k: v for k, v in payload.items()
-               if not k.startswith('_') and k not in self.not_stored_keys}
-        return cfg
+    def _filter(self, payload: dict) -> Union[dict, bool]:
+        """Filter keys starting with underscore and by filtered keys list"""
+        return {k: v for k, v in payload.items() if not k.startswith('_') and k not in self.not_stored_keys}
 
 
 class SystemConfig(Config):
+    """System read-only configuration"""
 
-    """ Basic skaben read-only configuration """
-
-    def __init__(self, config_path=None, root=None):
+    def __init__(self, config_path: str = None, root: str = None):
         self.data = {}
         self.logger_instance = None
         self.root = root if root else os.path.abspath(os.path.dirname(__file__))
@@ -142,10 +141,7 @@ class SystemConfig(Config):
             'sub': _subscribe,
         })
 
-    def logger(self,
-               file_path=None,
-               level=logging.DEBUG,
-               ):
+    def logger(self, file_path: str = None, level: str = logging.DEBUG) -> logging.Logger:
 
         if not file_path:
             file_path = 'local.log'
@@ -162,7 +158,7 @@ class SystemConfig(Config):
             self.logger_instance = logger
         return self.logger_instance
 
-    def set_external_handler(self, logger, name):
+    def set_external_handler(self, logger: logging.Logger, name: str) -> logging.Logger:
         try:
             level_name = name.upper()
             level = logging.getLevelName(level_name)
@@ -174,11 +170,12 @@ class SystemConfig(Config):
         logger.addHandler(ext_handler)
         return logger
 
-    def write(self, data=None, mode=None):
+    def write(self, data: dict = None, mode: str = None) -> PermissionError:
         raise PermissionError('System config cannot be created automatically. '
                               'Seems like config file is missing or corrupted.')
 
     def __del__(self):
+        """Clear loggers on instance delete"""
         if self.logger_instance:
             self.logger_instance.handlers.clear()
             del self.logger_instance
@@ -192,7 +189,7 @@ class DeviceConfig(Config):
 
     minimal_essential_conf = {}
 
-    def __init__(self, config_path):
+    def __init__(self, config_path: str):
         self.data = dict()
         self.not_stored_keys.extend(['message'])
         super().__init__(config_path)
@@ -238,7 +235,7 @@ class DeviceConfig(Config):
         except Exception:
             return self.write_default()
 
-    def save(self, payload=None):
+    def save(self, payload: dict = None):
         """ Apply and save persistent state """
         if payload:
             self.update(payload)
@@ -258,10 +255,11 @@ class DeviceConfigExtended(DeviceConfig):
 
     asset_paths = {}  # directory paths by file types
 
-    def __init__(self, config_path, system_config):
+    def __init__(self, config_path: str, system_config: SystemConfig):
         self.system = system_config
         self._update_paths(self.system.get("asset_types", []))
-        self.asset_root = os.path.join(self.system.root, self.system.get('assets_root'))
+        self.asset_root = os.path.join(self.system.root, self.system.get('asset_root'))
+
         if not os.path.exists(self.asset_root):
             os.mkdir(self.asset_root)
         super().__init__(config_path)
@@ -277,8 +275,8 @@ class DeviceConfigExtended(DeviceConfig):
 
     def clear_asset_paths(self):
         try:
-            for dir in self.asset_paths.values():
-                shutil.rmtree(dir)
+            for _dir in self.asset_paths.values():
+                shutil.rmtree(_dir)
             self.asset_paths = {}
         except Exception as e:
             raise Exception(f"cannot remove assets dir: {e}")
@@ -297,8 +295,8 @@ class DeviceConfigExtended(DeviceConfig):
             assets = self.get('assets', {})
 
             for file_data in list(files.items()):
-                hash, url = file_data
-                exists = assets.get(hash)
+                _hash, url = file_data
+                exists = assets.get(_hash)
                 if exists and exists.get('loaded') is True:
                     continue
 
@@ -311,9 +309,9 @@ class DeviceConfigExtended(DeviceConfig):
                     raise Exception(f"no local directory was created for `{file_type}` type of files")
 
                 to_be_download.update({
-                    hash: {
+                    _hash: {
                         "local_path": os.path.join(local_dir, orig_name),
-                        "hash": hash,
+                        "hash": _hash,
                         "url": url,
                         "file_type": file_type,
                         "loaded": False

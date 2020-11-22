@@ -3,9 +3,11 @@ import time
 import random
 
 from threading import Thread
+from typing import Union
 
 from skabenproto import packets as sp
-from skabenclient.helpers import make_event
+from skabenclient.helpers import make_event, Event
+from skabenclient.config import SystemConfig, DeviceConfig
 
 
 class BaseContext:
@@ -16,7 +18,7 @@ class BaseContext:
 
     event = dict()
 
-    def __init__(self, app_config):
+    def __init__(self, app_config: SystemConfig):
         self.config = app_config
 
         self.logger = self.config.logger()
@@ -44,7 +46,7 @@ class BaseContext:
             raise Exception(f'{self} error: device not provided')
 
     def get_last_timestamp(self):
-        """ Read previous timestamp value from 'ts' file """
+        """Read previous timestamp value from timestamp file"""
         with open(self.timestamp_fname, 'r') as fh:
             t = fh.read().rstrip()
             try:
@@ -54,21 +56,25 @@ class BaseContext:
                 self.rewrite_timestamp(t)
                 return t
 
-    def rewrite_timestamp(self, new_ts):
-        """ Write timestamp value to file 'ts' """
+
+    def rewrite_timestamp(self, new_ts: Union[str, int]) -> int:
+        """Write timestamp value to file"""
         with open(self.timestamp_fname, 'w') as fh:
             fh.write(str(int(new_ts)))
             return int(new_ts)
 
     def get_current_config(self):
-        """ load current device config """
+        """load current device config
+           TODO: check usage of this method! YAGNI
+        """
+
         current = self.device.state
         if not current:
             current = self.device.load()
         return current
 
-    def confirm_update(self, task_id, packet_type='ACK'):
-        """ ACK/NACK packet """
+    def confirm_update(self, task_id: str, packet_type: str = 'ACK') -> Union[sp.ACK, sp.NACK]:
+        """ACK/NACK packet"""
         if packet_type not in ('ACK', 'NACK'):
             raise Exception(f'packet type not ACK or NACK: {packet_type}')
 
@@ -78,6 +84,7 @@ class BaseContext:
                               uid=self.config.get('uid'),
                               task_id=task_id)
         self.q_ext.put(packet.encode())
+        return packet
 
     def __enter__(self):
         return self
@@ -90,7 +97,7 @@ class EventContext(BaseContext):
 
     filtered_keys = ['id', 'uid']
 
-    def absorb(self, event):
+    def absorb(self, event: Event):
         try:
             if event.type == "mqtt":
                 self.manage_mqtt(event)
@@ -100,8 +107,8 @@ class EventContext(BaseContext):
             # TODO: send message to q_ext on fail
             raise
 
-    def manage(self, event):
-        """ Managing events based on type """
+    def manage(self, event: Event):
+        """Managing events based on type"""
         try:
             # receive update from server
             command = event.cmd.lower()
@@ -119,7 +126,7 @@ class EventContext(BaseContext):
                 conf = self.get_current_config()
                 # send only required fields
                 if event.data:
-                    filtered = {k:v for k,v in conf.items() if k in event.data}
+                    filtered = {k: v for k, v in conf.items() if k in event.data}
                     if filtered:
                         conf = filtered
                 return self.send_config(conf)
@@ -148,7 +155,7 @@ class EventContext(BaseContext):
         except Exception as e:
             raise Exception(f'[E] MAIN context: {e}')
 
-    def manage_mqtt(self, event):
+    def manage_mqtt(self, event: Event):
         """Manage event from MQTT based on command
            Translate commands into internal event queue
         """
@@ -178,10 +185,14 @@ class EventContext(BaseContext):
                                  timestamp=self.timestamp)
                 self.q_ext.put(packet.encode())
             elif command == 'CUP':
+                if not datahold:
+                    raise Exception(f"empty datahold in CUP packet: {event}")
                 # update local configuration from packet data
                 event = make_event('device', 'update', datahold)
                 self.q_int.put(event)
             elif command == 'SUP':
+                if not datahold:
+                    raise Exception(f"empty datahold in SUP packet: {event}")
                 # send local configuration to server (filtered by field list)
                 event = make_event('device', 'sup', datahold.get('fields'))
                 self.q_int.put(event)
@@ -190,16 +201,16 @@ class EventContext(BaseContext):
         except Exception as e:
             raise Exception(f"[E] MQTT context: {e}")
 
-    def send_message(self, data):
-        """ INFO packet """
+    def send_message(self, data: dict):
+        """INFO packet"""
         packet = sp.INFO(topic=self.topic,
                          uid=self.uid,
                          timestamp=self.timestamp,
                          datahold=data)
         self.q_ext.put(packet.encode())
 
-    def send_config(self, data=None):
-        """ SUP packet """
+    def send_config(self, data: dict = None):
+        """SUP packet"""
         try:
             if not data:
                 raise Exception("cannot send empty data")
@@ -217,8 +228,8 @@ class EventContext(BaseContext):
         except Exception as e:
             raise Exception(f"[E] config send - {e} \n {self}")
 
-    def send_config_request(self, keys=None):
-        """ CUP packet """
+    def send_config_request(self, keys: list = None):
+        """CUP packet"""
         current = self.get_current_config()
         if keys:
             datahold = {'request': [k for k in current if k in keys]}
@@ -232,32 +243,37 @@ class EventContext(BaseContext):
                         datahold=datahold)
         self.q_ext.put(packet.encode())
 
-    def save_config_and_report(self, event):
-        """ ACK/NACK packet """
-        task_id = event.data.get('task_id', '12345')
-        response = 'ACK'
+    def save_config_and_report(self, event: Event):
+        """ACK/NACK packet"""
+        # todo: add reason field to ACK/NACK
+        response = "ACK"
+
+        try:
+            task_id = event.data.get("task_id", "missing")
+        except AttributeError as e:
+            raise AttributeError(f"nothing to save - datahold missing: {e}")
+
         try:
             self.device.save(event.data)
+            return self.confirm_update(task_id, response)
         except Exception as e:
             response = 'NACK'
-            raise Exception(f'cannot apply new config: {e}')
-        finally:
+            self.logger.exception(f'cannot apply new config: {e}')
             return self.confirm_update(task_id, response)
 
 
 class Router(Thread):
 
-    """
-        Routing and handling queue events
+    """Routing and handling queue events
 
-        external queue used only for sending messages to server via MQTT
-        new mqtt messages from server comes to internal queue from MQTTClient
-        queues separated because of server messages top priority
+       external queue used only for sending messages to server via MQTT
+       new mqtt messages from server comes to internal queue from MQTTClient
+       queues separated because of server messages top priority
     """
 
     managed_events = ["exit", "device", "mqtt"]
 
-    def __init__(self, config):
+    def __init__(self, config: SystemConfig):
         super().__init__()
         self.daemon = True
         self.running = False
@@ -268,7 +284,7 @@ class Router(Thread):
         self.config = config
 
     def run(self):
-        """ Routing events from internal queue """
+        """Routing events from internal queue"""
         self.logger.debug('router module starting...')
         self.running = True
 
@@ -292,9 +308,9 @@ class Router(Thread):
 
             except Exception as e:
                 print(f"{e}")
-                self.logger.exception()
+                self.logger.exception("[!]")
 
     def stop(self):
-        """ Full stop """
+        """Full stop"""
         self.logger.debug('router module stopping...')
         self.running = False

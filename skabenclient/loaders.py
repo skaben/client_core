@@ -126,51 +126,6 @@ class SoundLoader:
             raise Exception
 
 
-class ImageLoader:
-
-    """[DEPRECATED] due to remove of pygame-based GUI
-
-        Loads images from directories, scaling images, provide pygame image objects.
-    """
-
-    def __init__(self, image_dir):
-        self.images = {}
-        for r, d, f in os.walk(image_dir):
-            f.sort()
-            for filename in f:
-                self.images.update({filename: pg.image.load(filename).convert()})
-
-    def scale_image_constrain(self, img, w, h):
-        """ Scale image constrain proportions """
-        _o = img.get_rect()
-        if _o.width > _o.height:
-            if w > _o.width:
-                percent = round(w / _o.width, 2)
-                img = pg.transform.scale(img, (int(_o.width / percent), int(_o.height / percent)))
-            else:
-                percent = round(_o.width / w, 2)
-                img = pg.transform.scale(img, (int(_o.width * percent), int(_o.height * percent)))
-        else:
-            if h > _o.height:
-                percent = round(h / _o.height, 2)
-                img = pg.transform.scale(img, (int(_o.width * percent), int(_o.height * percent)))
-            else:
-                percent = round(_o.height / h, 2)
-                img = pg.transform.scale(img, (int(_o.width / percent), int(_o.height / percent)))
-        return img
-
-    def scale_image(self, img, w, h):
-        """ Scale image fit to screen """
-        _o = img.get_rect()
-        if _o.height > _o.width:
-            percent = round(w / _o.width, 2)
-            img = pg.transform.scale(img, (int(_o.width * percent), h))
-        else:
-            percent = round(h / _o.height, 2)
-            img = pg.transform.scale(img, (w, int(_o.height * percent)))
-        return img
-
-
 class HTTPLoader:
     """File loader context manager. Loads file from url
 
