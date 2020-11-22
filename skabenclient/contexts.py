@@ -71,7 +71,7 @@ class BaseContext:
             current = self.device.load()
         return current
 
-    def confirm_update(self, task_id: str, packet_type: str = 'ACK'):
+    def confirm_update(self, task_id: str, packet_type: str = 'ACK') -> Union[sp.ACK, sp.NACK]:
         """ACK/NACK packet"""
         if packet_type not in ('ACK', 'NACK'):
             raise Exception(f'packet type not ACK or NACK: {packet_type}')
@@ -82,6 +82,7 @@ class BaseContext:
                               uid=self.config.get('uid'),
                               task_id=task_id)
         self.q_ext.put(packet.encode())
+        return packet
 
     def __enter__(self):
         return self
@@ -243,18 +244,20 @@ class EventContext(BaseContext):
     def save_config_and_report(self, event: Event):
         """ACK/NACK packet"""
         # todo: add reason field to ACK/NACK
-        response = 'ACK'
-        task_id = '0'
+        response = "ACK"
+
         try:
-            task_id = event.data.get('task_id')
-            self.device.save(event.data)
-            self.confirm_update(task_id, response)
+            task_id = event.data.get("task_id", "missing")
         except AttributeError as e:
             raise AttributeError(f"nothing to save - datahold missing: {e}")
+
+        try:
+            self.device.save(event.data)
+            return self.confirm_update(task_id, response)
         except Exception as e:
             response = 'NACK'
-            self.confirm_update(task_id, response)
-            raise Exception(f'cannot apply new config: {e}')
+            self.logger.exception(f'cannot apply new config: {e}')
+            return self.confirm_update(task_id, response)
 
 
 class Router(Thread):
