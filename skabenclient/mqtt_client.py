@@ -2,7 +2,7 @@ import json
 import time
 import logging
 
-from typing import Union
+from typing import Any
 from multiprocessing import Process
 import paho.mqtt.client as mqtt
 
