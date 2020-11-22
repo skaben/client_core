@@ -1,8 +1,10 @@
+from skabenclient.config import SystemConfig
+from skabenclient.device import BaseDevice
 from skabenclient.mqtt_client import MQTTClient
 from skabenclient.contexts import Router
 
 
-def start_app(app_config, device):
+def start_app(app_config: SystemConfig, device: BaseDevice):
     """ Start application
 
         app_config: system skaben config object

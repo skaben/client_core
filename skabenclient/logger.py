@@ -1,11 +1,11 @@
 import logging
 import logging.handlers
+from multiprocessing import Queue
 from skabenclient.helpers import make_event
 
 
 class ReportHandler(logging.handlers.QueueHandler):
-
-    """ Transform log records into INFO packets """
+    """Custom INFO log sender, transform records into INFO packets"""
 
     def __init__(self, queue):
         super().__init__(queue)
@@ -23,16 +23,12 @@ class ReportHandler(logging.handlers.QueueHandler):
         self.queue.put(event)
 
 
-def make_format(format):
-    return logging.Formatter(format)
-
-
-def make_local_loggers(file_path, level):
-    """ Make logger """
+def make_local_loggers(file_path: str, level: str):
+    """Create local logger"""
     handlers = []
-    log_format = make_format('%(asctime)s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s')
+    format_str = '%(asctime)s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s'
+    log_format = logging.Formatter(format_str)
 
-    # set handlers
     fh = logging.FileHandler(filename=file_path)
     stream = logging.StreamHandler()
 
@@ -44,9 +40,10 @@ def make_local_loggers(file_path, level):
     return handlers
 
 
-def make_network_logger(queue, level):
+def make_network_logger(queue: Queue, level: str):
+    """create network logger"""
     handler = ReportHandler(queue)
-    log_format = make_format("%(message)s")
+    log_format = logging.Formatter("%(message)s")
     handler.setFormatter(log_format)
     handler.setLevel(level)
 
