@@ -451,7 +451,10 @@ def test_full_config(live_server, get_extended_config):
 
     dev_config = get_extended_config
     dev_config.asset_paths = {}
-    dev_config.make_asset_paths([ftype,])
+    dev_config.data = {}
+    dev_config.save()
+
+    dev_config.make_asset_paths([ftype])
 
     FULL_EXAMPLE = {
         "file_list": {
@@ -490,4 +493,3 @@ def test_full_config(live_server, get_extended_config):
     assert result["norm"] == [json_norm]
     assert result["ext"] == [json_ext]
     assert result["assets"] == ASSETS_EXPECTED
-
