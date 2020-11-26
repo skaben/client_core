@@ -5,7 +5,7 @@ import logging
 import concurrent.futures
 import multiprocessing as mp
 import shutil
-from typing import Union, List, TextIO, Any, Optional
+from typing import Union, List, TextIO, Any
 
 
 from skabenclient.helpers import get_mac, get_ip, FileLock

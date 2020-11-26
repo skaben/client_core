@@ -7,7 +7,7 @@ from typing import Union
 
 from skabenproto import packets as sp
 from skabenclient.helpers import make_event, Event
-from skabenclient.config import SystemConfig, DeviceConfig
+from skabenclient.config import SystemConfig
 
 
 class BaseContext:
@@ -41,7 +41,7 @@ class BaseContext:
         # for event context topic is always pub
         self.topic = self.config.get('pub')
         self.uid = self.config.get('uid')
-        self.device = self.config.get("device")
+        self.device = self.config.get('device')
         if not self.device:
             raise Exception(f'{self} error: device not provided')
 
@@ -55,7 +55,6 @@ class BaseContext:
                 t = 0
                 self.rewrite_timestamp(t)
                 return t
-
 
     def rewrite_timestamp(self, new_ts: Union[str, int]) -> int:
         """Write timestamp value to file"""
