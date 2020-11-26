@@ -1,12 +1,8 @@
 import os
 import time
 import yaml
-import json
 import logging
-import pygame as pg
 import pygame.mixer as mixer
-
-from typing import Union
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -146,33 +142,37 @@ class HTTPLoader:
             total=self.retries,
             backoff_factor=1,
             status_forcelist=[429, 500, 502, 503, 504],
-            method_whitelist=["HEAD", "GET", "OPTIONS"]
+            method_whitelist=['HEAD', 'GET', 'OPTIONS']
         )
 
         adapter = HTTPAdapter(max_retries=retry_strategy)
 
         http = requests.Session()
-        http.mount("https://", adapter)
-        http.mount("http://", adapter)
+        http.mount('https://', adapter)
+        http.mount('http://', adapter)
+
+        auth_token = system_config.get('auth_token')
+        if auth_token:
+            http.headers.update({'Authorization': f'Token {auth_token}'})
 
         self.http = http
 
     def parse_url(self, remote_url: str) -> dict:
         arr = remote_url.split('/')
-        if len(arr[-1].split(".")) < 2:
+        if len(arr[-1].split('.')) < 2:
             raise Exception('Provide FULL local filename: '
                             'HTTPLoader.get_file(remote_url, local_path="file.extension")')
 
         return {
-            "file": arr[-1],
-            "base": '/'.join(arr[:3]),
+            'file': arr[-1],
+            'base': '/'.join(arr[:3]),
         }
 
     def get_json(self, remote_url: str) -> dict:
         self.logger.debug(f"... retrieving JSON from {remote_url}")
         result = {}
         try:
-            response = requests.get(remote_url)
+            response = self.http.get(remote_url)
             result = response.json()
         except Exception as e:
             raise Exception(f"... failed to get JSON from {remote_url}: {e}")
