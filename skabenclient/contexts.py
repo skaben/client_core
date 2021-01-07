@@ -159,13 +159,13 @@ class EventContext(BaseContext):
            Translate commands into internal event queue
         """
 
-        command = event.data.get('command')
-        timestamp = event.data.get('timestamp')
-        datahold = event.data.get('datahold')
+        command = event.data.get('command', '')
+        timestamp = event.data.get('timestamp', 0)
+        datahold = event.data.get('datahold', {})
 
         if command == 'WAIT':
             # send me to the future
-            self.rewrite_timestamp(timestamp + datahold['timeout'])
+            self.rewrite_timestamp(timestamp + datahold.get('timeout', 10))
             return
 
         if timestamp < self.timestamp:
@@ -184,21 +184,22 @@ class EventContext(BaseContext):
                                  timestamp=self.timestamp)
                 self.q_ext.put(packet.encode())
             elif command == 'CUP':
-                if not datahold:
-                    raise Exception(f"empty datahold in CUP packet: {event}")
-                # update local configuration from packet data
-                event = make_event('device', 'update', datahold)
-                self.q_int.put(event)
+                self.mqtt_to_internal(event, 'update')
             elif command == 'SUP':
-                if not datahold:
-                    raise Exception(f"empty datahold in SUP packet: {event}")
-                # send local configuration to server (filtered by field list)
-                event = make_event('device', 'sup', datahold.get('fields'))
-                self.q_int.put(event)
+                self.mqtt_to_internal(event, 'sup')
+            elif command == 'INFO':
+                self.mqtt_to_internal(event, 'info')
             else:
                 raise Exception(f"unrecognized command: {command}")
         except Exception as e:
             raise Exception(f"[E] MQTT context: {e}")
+
+    def mqtt_to_internal(self, mqtt_event: Event, internal_command: str):
+        datahold = mqtt_event.data.get('datahold')
+        if not datahold:
+            raise Exception(f'empty datahold in {mqtt_event.data.get("command").upper()} packet: {mqtt_event}')
+        event = make_event('device', internal_command, datahold)
+        self.q_int.put(event)
 
     def send_message(self, data: dict):
         """INFO packet"""
@@ -276,9 +277,10 @@ class Router(Thread):
         super().__init__()
         self.daemon = True
         self.running = False
-        self.q_int = config.get("q_int")
-        self.q_ext = config.get("q_ext")
-        self.logger = config.logger()
+        self.queue_int = config.get("q_int")
+        self.queue_ext = config.get("q_ext")
+        self.queue_log = config.get("q_log")
+        self.logger = config.logger_instance
         # passing to contexts
         self.config = config
 
@@ -288,18 +290,22 @@ class Router(Thread):
         self.running = True
 
         while self.running:
-            if self.q_int.empty():
+            if not self.queue_log.empty():
+                log_record = self.queue_log.get()
+                self.logger.handle(log_record)
+
+            if self.queue_int.empty():
                 time.sleep(.1)
                 continue
 
             # get event from internal queue
             try:
-                event = self.q_int.get()
+                event = self.queue_int.get()
 
                 if event.type not in self.managed_events:
                     raise Exception(f"cannot determine message type for:\n{event}")
                 elif event.type == "exit":
-                    self.q_ext.put(event)
+                    self.queue_ext.put(event)
                     return self.stop()
 
                 with EventContext(self.config) as context:
