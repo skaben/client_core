@@ -1,5 +1,6 @@
 import time
 import pytest
+import logging
 import threading
 from queue import Queue
 
@@ -43,6 +44,15 @@ def get_from_queue():
 
     return _wrap
 
+
+@pytest.fixture(autouse=True)
+def cleanup_logger_handlers():
+    yield
+    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    loggers.append(logging.getLogger())  # add root logger to list
+    [logger.handlers.clear() for logger in loggers]
+
+
 """
 def test_router_init(get_router):
     router, syscfg, devcfg = get_router
@@ -53,6 +63,7 @@ def test_router_init(get_router):
 
     assert router.logger, "logger was not created"
 """
+
 
 def test_start_app_routine(get_config, default_config, get_from_queue, monkeypatch):
     """ Test all client components was initialized and can be start successfully """
@@ -82,8 +93,6 @@ def test_start_app_routine(get_config, default_config, get_from_queue, monkeypat
     for service in ['mqtt', 'router', 'device']:
         assert service in result, f'{service} not started'
 
-    syscfg.logger_instance.handlers.clear()
-
 
 def test_router_start_stop(get_router, monkeypatch, caplog):
     router, syscfg, devcfg = get_router
@@ -95,7 +104,7 @@ def test_router_start_stop(get_router, monkeypatch, caplog):
     assert router.running is False, 'router not stopped'
     router.join(.1)
     assert threading.active_count() == 1, 'seems like thread was not exited'
-    syscfg.logger_instance.handlers.clear()
+
 
 def test_router_exit_by_event(get_router, request, get_from_queue):
     router, syscfg, devcfg = get_router
@@ -115,7 +124,7 @@ def test_router_exit_by_event(get_router, request, get_from_queue):
     assert not len(expected_event) > 1, 'too many events'
     assert expected_event[0].type == 'exit', 'external message not sent'
     assert router.running is False, 'router was not stopped'
-    syscfg.logger_instance.handlers.clear()
+
 
 def test_router_event_mqtt(get_router, monkeypatch, get_from_queue):
     router, syscfg, devcfg = get_router
@@ -132,7 +141,7 @@ def test_router_event_mqtt(get_router, monkeypatch, get_from_queue):
     assert not len(result) > 1, 'too many events'
     assert result[0].data.get('command') == 'PING'
     assert result[0].data.get('datahold') == {'data': 'test'}
-    syscfg.logger_instance.handlers.clear()
+
 
 @pytest.mark.parametrize('event_data', ({'dict': 'data'}, None))
 def test_router_event_device(get_router, monkeypatch, get_from_queue, event_data):
@@ -150,4 +159,3 @@ def test_router_event_device(get_router, monkeypatch, get_from_queue, event_data
     assert result[0].type == 'device'
     assert result[0].cmd == 'test'
     assert result[0].data == event_data
-    syscfg.logger_instance.handlers.clear()

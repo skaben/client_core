@@ -2,6 +2,8 @@ import os
 import yaml
 import asyncio
 import logging
+import logging.handlers
+
 import concurrent.futures
 import multiprocessing as mp
 import shutil
@@ -9,14 +11,12 @@ from typing import Union, List, TextIO, Any
 
 
 from skabenclient.helpers import get_mac, get_ip, FileLock
-from skabenclient.logger import make_local_loggers, make_network_logger
+from skabenclient.logger import CoreLogger
 from skabenclient.loaders import get_yaml_loader, HTTPLoader
 
 import collections.abc
 
 ExtendedLoader = get_yaml_loader()
-LOGGERS = {}
-
 _mapping = collections.abc.Mapping
 
 
@@ -112,9 +112,10 @@ class Config:
 class SystemConfig(Config):
     """System read-only configuration"""
 
+    logger_instance = None
+
     def __init__(self, config_path: str = None, root: str = None):
         self.data = {}
-        self.logger_instance = None
         self.root = root if root else os.path.abspath(os.path.dirname(__file__))
         super().__init__(config_path)
 
@@ -137,38 +138,16 @@ class SystemConfig(Config):
             'ip': get_ip(iface),
             'q_int': mp.Queue(),
             'q_ext': mp.Queue(),
+            'q_log': mp.Queue(),
             'pub': _publish,
             'sub': _subscribe,
         })
 
-    def logger(self, file_path: str = None, level: str = logging.DEBUG) -> logging.Logger:
+        self.log = CoreLogger('device', internal_queue=self.get('q_int'), logging_queue=self.get('q_log'))
+        self.logger_instance = self.log.make_root_logger()
 
-        if not file_path:
-            file_path = 'local.log'
-
-        if not self.logger_instance:
-            logger = logging.getLogger("main")
-            loc_handlers = make_local_loggers(file_path, level)
-            for handler in loc_handlers:
-                logger.addHandler(handler)
-            ext = self.data.get("external_logging")
-            if ext:
-                self.set_external_handler(logger, ext)
-            logger.setLevel(level)
-            self.logger_instance = logger
-        return self.logger_instance
-
-    def set_external_handler(self, logger: logging.Logger, name: str) -> logging.Logger:
-        try:
-            level_name = name.upper()
-            level = logging.getLevelName(level_name)
-            if not level or not isinstance(level, int):
-                raise Exception
-        except Exception:
-            level = logging.ERROR
-        ext_handler = make_network_logger(self.data["q_int"], level)
-        logger.addHandler(ext_handler)
-        return logger
+    def logger(self, name: str = None, level: int = logging.DEBUG) -> logging.Logger:
+        return self.log.make_logger(name=name, level=level, ext_level=self.get('external_logging'))
 
     def write(self, data: dict = None, mode: str = None) -> PermissionError:
         raise PermissionError('System config cannot be created automatically. '
