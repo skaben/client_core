@@ -10,6 +10,14 @@ from skabenclient.tests.mock.data import yaml_content, yaml_content_as_dict, bas
 from skabenclient.helpers import Event
 
 
+@pytest.fixture(autouse=True)
+def cleanup_logger_handlers():
+    yield
+    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    loggers.append(logging.getLogger())  # add root logger to list
+    [logger.handlers.clear() for logger in loggers]
+
+
 def test_config_init(get_config):
     """ Test initializes Config """
     cfg = get_config(Config, {'test': 'main'})
@@ -124,7 +132,7 @@ def test_config_system_init_base(get_config, default_config):
     """ Test creates SystemConfig """
     config = default_config('sys')
     cfg = get_config(SystemConfig, config)
-    test_keys = ['q_int', 'q_ext', 'ip', 'uid', 'sub', 'pub'] \
+    test_keys = ['q_int', 'q_ext', 'q_log', 'ip', 'uid', 'sub', 'pub'] \
                 + list(config.keys())
     conf_keys = list(cfg.data.keys())
     test_keys.sort()
@@ -136,63 +144,86 @@ def test_config_system_init_base(get_config, default_config):
 def test_config_system_logger(get_config, default_config):
     """ Test creates SystemConfig logger """
     cfg = get_config(SystemConfig, default_config('sys'))
-    logger = cfg.logger()
+    logger = cfg.logger_instance
 
-    assert logger.level == logging.DEBUG, "bad logging level"
-    assert len(logger.handlers) == 2, "bad number of logger handlers"
+    assert logger.level == logging.DEBUG, "wrong logging level"
+    assert len(logger.handlers) == 3, f"wrong number of logger handlers: {logger.handlers}"
     assert cfg.logger_instance is logger
+    assert cfg.log.internal_queue == cfg.get('q_int')
+    assert cfg.log.logging_queue == cfg.get('q_log')
 
-    cfg.logger_instance.handlers.clear()
 
 def test_config_system_logger_fpath(get_config, default_config):
     """ Test creates SystemConfig logger """
     cfg = get_config(SystemConfig, default_config('sys'))
 
     real_root = os.path.abspath(os.path.dirname(__file__))
-    file_path = os.path.join(real_root, 'res', 'logtest.log')
 
-    logger = cfg.logger(file_path=file_path,
+    logger = cfg.logger(name='logtest',
                         level=logging.ERROR)
 
     assert logger.level == logging.ERROR, f"wrong logging level: {logger}"
-    assert len(logger.handlers) == 2, "bad number of logger handlers"
     for handler in logger.handlers:
-        if isinstance(handler, logging.FileHandler):
-            assert getattr(handler, 'baseFilename') == file_path, \
-                f'wrong file path passed to logger handler'
-    cfg.logger_instance.handlers.clear()
+        if handler.name == 'file':
+            file_path = os.path.join(real_root, 'res', 'logtest.log')
+        elif handler.name == 'errors':
+            file_path = os.path.join(real_root, 'res', 'logtest-error.log')
+        else:
+            continue
+        assert getattr(handler, 'baseFilename') == file_path, f'wrong file path passed to logger handler'
 
 
-@pytest.mark.parametrize("loglevel, loglevelint", (["debug", 10],
-                                                   ["info", 20],
-                                                   ["error", 40],
-                                                   ['bad', 40],
-                                                   [True, 40]))
-def test_config_system_logger_external(get_config, default_config, monkeypatch, loglevel, loglevelint):
-    """ Test sending logging message """
+def test_config_process_logger(get_config, default_config):
+    """Test making non-root logger"""
+    cfg = get_config(SystemConfig, default_config('sys'))
+    logger = cfg.logger()
 
-    int_queue = []
-    data = "test"
+    msg = "there should be only one queue handler"
+    assert len(logger.handlers) == 1, f"{msg}: {logger.handlers}"
+
+
+def test_config_process_logger_external(get_config, default_config):
+    """test making non-root logger with external handler"""
+
     conf = default_config('sys')
-    conf.update({"external_logging": loglevel})
+    conf.update({"external_logging": logging.DEBUG})
     cfg = get_config(SystemConfig, conf)
 
     logger = cfg.logger()
-    monkeypatch.setattr(cfg.data["q_int"], "put", lambda x: int_queue.append(x))
+
+    msg = "there should be queue handler + external handler, total of 2"
+    assert len(logger.handlers) == 2, f"{msg}: {logger.handlers}"
+
+
+@pytest.mark.parametrize("levelname, levelno", (["DEBUG", logging.DEBUG],
+                                                ["INFO", logging.INFO],
+                                                ["ERROR", logging.ERROR]))
+def test_config_process_logger_external(get_config, default_config, monkeypatch, levelname, levelno):
+    """Test sending logging message"""
+
+    int_queue = []
+    message = "test"
+    conf = default_config('sys')
+    conf.update({"external_logging": levelno})
+    cfg = get_config(SystemConfig, conf)
+    monkeypatch.setattr(cfg.log.internal_queue, "put", lambda x: int_queue.append(x))
+
+    assert levelname not in cfg.log.loggers, f'log with name {levelname} already created'
+    logger = cfg.logger(levelname)
 
     try:
-        log_call = getattr(logger, loglevel)
-        log_call(data)
+        log_call = getattr(logger, levelname.lower())
     except Exception:
-        logger.error(data)
+        log_call = getattr(logger, 'error')
+    log_call(message)
+    expected = {"msg": message, "lvl": levelname}
 
-    expected = {"msg": data, "lvl": loglevelint}
+    err = "there should be queue handler + external handler, total of 2"
 
-    assert len(logger.handlers) == 3, f"bad number of logger handlers: {logger.handlers}"
-    assert int_queue, "queue is empty"
-    assert isinstance(int_queue[0], Event), f"bad queue content: {int_queue}"
+    assert int_queue, "internal queue has no messages"
+    assert len(logger.handlers) == 2, f"{err}: {logger.handlers}"
+    assert isinstance(int_queue[0], Event), f"wrong queue content: {int_queue}"
     assert int_queue[0].data == expected, f"wrong data in event: {int_queue[0]}"
-    cfg.logger_instance.handlers.clear()
 
 
 def test_config_device_init(get_config, monkeypatch):
@@ -336,4 +367,4 @@ def test_file_lock_busy(get_config, monkeypatch, config_dict):
             assert cfg.write()
             assert cfg.read()
 
-    assert res == None, 'lock acquired but should not'
+    # assert res == None, 'lock acquired but should not'
