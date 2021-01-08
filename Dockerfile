@@ -18,5 +18,6 @@ RUN python -m pip install --upgrade pip && \
     python -m pip install -r /build_requirements.txt
 
 RUN mkdir /app
+COPY deploy_to_repo.sh /app/deploy_to_repo.sh
 WORKDIR /app
 

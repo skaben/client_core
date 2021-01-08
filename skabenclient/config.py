@@ -119,12 +119,13 @@ class SystemConfig(Config):
         self.root = root if root else os.path.abspath(os.path.dirname(__file__))
         super().__init__(config_path)
 
-        iface = self.data.get('iface')
+        self.DEBUG = self.get('debug')
+        iface = self.get('iface')
 
         if not iface:
             raise Exception('network interface missing in config')
 
-        topic = self.data.get('topic')
+        topic = self.get('topic')
         uid = get_mac(iface)
 
         # set PUB/SUB topics
@@ -143,10 +144,15 @@ class SystemConfig(Config):
             'sub': _subscribe,
         })
 
-        self.log = CoreLogger('device', internal_queue=self.get('q_int'), logging_queue=self.get('q_log'))
+        self.log = CoreLogger(root=self.root,
+                              logging_queue=self.get('q_log'),
+                              internal_queue=self.get('q_int'),
+                              debug=self.DEBUG)
         self.logger_instance = self.log.make_root_logger()
 
-    def logger(self, name: str = None, level: int = logging.DEBUG) -> logging.Logger:
+    def logger(self, name: str = None, level: int = logging.INFO) -> logging.Logger:
+        if self.DEBUG:
+            level = logging.DEBUG
         return self.log.make_logger(name=name, level=level, ext_level=self.get('external_logging'))
 
     def write(self, data: dict = None, mode: str = None) -> PermissionError:
