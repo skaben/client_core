@@ -160,6 +160,7 @@ def test_config_system_logger_debug(get_config, default_config):
     cfg = get_config(SystemConfig, debug_config)
     logger = cfg.logger_instance
 
+
     assert logger.level == logging.DEBUG, "wrong logging level"
     assert len(logger.handlers) == 3, f"wrong number of logger handlers: {logger.handlers}"
     assert cfg.logger_instance is logger
@@ -189,7 +190,6 @@ def test_config_process_logger(get_config, default_config):
     """Test making non-root logger"""
     cfg = get_config(SystemConfig, default_config('sys'))
     logger = cfg.logger()
-
     msg = "there should be only one queue handler"
     assert len(logger.handlers) == 1, f"{msg}: {logger.handlers}"
 
