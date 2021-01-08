@@ -242,6 +242,7 @@ class DeviceConfigExtended(DeviceConfig):
 
     def __init__(self, config_path: str, system_config: SystemConfig):
         self.system = system_config
+        self.logger = self.system.logger()
         self._update_paths(self.system.get("asset_types", []))
         asset_root = self.system.get('asset_root')
         if not asset_root:
@@ -308,16 +309,20 @@ class DeviceConfigExtended(DeviceConfig):
             return to_be_download
 
     def get_file(self, file_data: dict) -> dict:
-        with HTTPLoader(self.system) as loader:
-            path = loader.get_file(file_data["url"], file_data["local_path"])
-            return {file_data["hash"]: path}
+        try:
+            with HTTPLoader(self.system) as loader:
+                path = loader.get_file(file_data["url"], file_data["local_path"])
+                if path:
+                    self.set_file_loaded(file_data["hash"])
+                    return {file_data["hash"]: path}
+        except Exception as e:
+            self.logger.exception(f'while loading file: {e}')
 
     async def download(self, files: List[dict]) -> dict:
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.system.get("max_workers", 3))
         loop = asyncio.get_event_loop()
         for item in files:
             await loop.run_in_executor(executor, self.get_file, item)
-            self.set_file_loaded(item["hash"])
         return self.data["assets"]
 
     def get_files_async(self, files: List[dict]):
@@ -327,8 +332,7 @@ class DeviceConfigExtended(DeviceConfig):
 
     def get_files_sync(self, files: List[dict]):
         for item in files:
-            if self.get_file(item):
-                self.set_file_loaded(item["hash"])
+            self.get_file(item)
         return self.data["assets"]
 
     def set_file_loaded(self, _hash: str):

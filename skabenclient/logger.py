@@ -7,7 +7,6 @@ from multiprocessing import Queue
 from skabenclient.helpers import make_event
 
 
-
 def get_baseconf(root: str, debug: bool = False) -> dict:
     fmt = '%(asctime)s :: %(processName)-10s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s'
     min_log_level = 'DEBUG' if debug else 'INFO'

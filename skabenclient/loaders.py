@@ -184,11 +184,9 @@ class HTTPLoader:
             file_name = self.parse_url(remote_url)['file']
             local_path = os.path.join(local_path, file_name)
 
-        self.logger.debug(f"... retrieving FILE from {remote_url} to {local_path}")
-        self.http.get(f"{remote_url}", stream=True)
-
         try:
-            response = requests.get(remote_url, stream=True)
+            self.logger.debug(f"... retrieving FILE from {remote_url} to {local_path}")
+            response = self.http.get(f"{remote_url}", stream=True)
             with open(local_path, 'wb') as fh:
                 for data in response.iter_content():
                     fh.write(data)
