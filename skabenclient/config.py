@@ -243,8 +243,10 @@ class DeviceConfigExtended(DeviceConfig):
     def __init__(self, config_path: str, system_config: SystemConfig):
         self.system = system_config
         self._update_paths(self.system.get("asset_types", []))
-        self.asset_root = os.path.join(self.system.root, self.system.get('asset_root'))
-
+        asset_root = self.system.get('asset_root')
+        if not asset_root:
+            raise Exception('Assets directory not found. Parameter `asset_root` must be provided in system config')
+        self.asset_root = os.path.join(self.system.root, asset_root)
         if not os.path.exists(self.asset_root):
             os.mkdir(self.asset_root)
         super().__init__(config_path)
