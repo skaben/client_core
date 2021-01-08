@@ -30,15 +30,17 @@ def get_baseconf(root: str, debug: bool = False) -> dict:
                 'formatter': 'short'
             },
             'file': {
-                'class': 'logging.FileHandler',
+                'class': 'logging.handlers.RotatingFileHandler',
+                'maxBytes': 4096,
+                'backupCount': 5,
                 'filename': os.path.join(root, 'messages.log'),
-                'mode': 'w',
                 'formatter': 'detailed',
             },
             'errors': {
-                'class': 'logging.FileHandler',
+                'class': 'logging.handlers.RotatingFileHandler',
+                'maxBytes': 4096,
+                'backupCount': 3,
                 'filename': os.path.join(root, 'errors.log'),
-                'mode': 'w',
                 'level': 'ERROR',
                 'formatter': 'detailed',
             },
