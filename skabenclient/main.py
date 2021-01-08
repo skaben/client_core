@@ -24,10 +24,8 @@ def start_app(app_config: SystemConfig, device: BaseDevice):
             mqtt_client.start()
         router.start()
         device.run()
-        print(f'running application with config:\n {app_config}')
     except KeyboardInterrupt:
-        print('catched keyboard interrupt')
-        raise SystemExit('exiting')
+        raise SystemExit('Catch keyboard interrupt. Exiting')
     except Exception:
         raise
     finally:

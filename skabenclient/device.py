@@ -29,14 +29,14 @@ class BaseDevice:
 
     def run(self):
         """start application device module"""
-        print('application is starting...')
+        self.logger.info('application starting')
         self.logger.debug(f'{self} starting with device config: \n {self.config}')
         reload_event = make_event('device', 'reload')
         self.q_int.put(reload_event)
 
     def stop(self):
         """stop application device module"""
-        print('device is stopping...')
+        self.logger.info('device is stopping...')
         self.logger.debug(f"stopping device {self}")
         end_event = make_event("exit")
         self.q_int.put(end_event)
