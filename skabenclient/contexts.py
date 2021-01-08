@@ -310,12 +310,10 @@ class Router(Thread):
 
                 with EventContext(self.config) as context:
                     context.absorb(event)
-
-            except Exception as e:
-                print(f"{e}")
+            except Exception:
                 self.logger.exception("[!]")
 
     def stop(self):
         """Full stop"""
-        self.logger.debug('router module stopping...')
+        self.logger.info('router module stopping...')
         self.running = False

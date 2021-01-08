@@ -1,4 +1,5 @@
 # local
+*.log.*
 skabenclient/tests/res/*.yml
 timestamp
 ts

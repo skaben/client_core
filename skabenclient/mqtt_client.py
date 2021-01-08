@@ -1,6 +1,5 @@
 import json
 import time
-import logging
 
 from typing import Any
 from multiprocessing import Process
@@ -55,6 +54,7 @@ class MQTTClient(Process):
         self.event = dict()
         self.daemon = True
         self.client = None
+        self.logger = config.logger()
 
         # Queues
         self.q_int = config.get('q_int')
@@ -73,7 +73,7 @@ class MQTTClient(Process):
         self.client_id = f"{config.get('topic')}_{config.get('uid')}"
 
         if not self.broker_ip:
-            logging.error('[!] cannot configure client, broker ip missing. exiting...')
+            self.logger.error('[!] cannot configure client, broker ip missing. exiting...')
             return
 
     def init_client(self):
@@ -98,7 +98,7 @@ class MQTTClient(Process):
             self.client.loop()  # manual loop while not connected
             sleep_time = self.default_timeout  # default sleep time
             tries += 1
-            print(f':: trying MQTT broker: {tries}, next try after {sleep_time}s')
+            self.logger.info(f':: trying MQTT broker: {tries}, next try after {sleep_time}s')
             try:
                 self.client.connect(host=self.broker_ip,
                                     port=self.broker_port,
@@ -111,16 +111,15 @@ class MQTTClient(Process):
             except (ConnectionRefusedError, OSError):
                 sleep_time = 30
                 _errm = f'mqtt broker not available, waiting {sleep_time}s'
-                print(_errm)
-                logging.error(_errm)
+                self.logger.error(_errm)
             except MQTTAuthError:
-                logging.exception('auth error. check system config ')
+                self.logger.exception('auth error. check system config ')
                 self.q_int.put(exit_message)
             except MQTTProtocolError:
-                logging.exception('protocol error. report immediately')
+                self.logger.exception('protocol error. report immediately')
                 self.q_int.put(exit_message)
             except Exception:
-                logging.exception('exception occured')
+                self.logger.exception('exception occured')
                 self.q_int.put(exit_message)
             time.sleep(sleep_time)
 
@@ -128,13 +127,11 @@ class MQTTClient(Process):
                  '{broker_ip}:{broker_port} ' \
                  'as {client._client_id}'.format(**self.__dict__)
 
-        logging.info(_connm)
-        print(_connm)
+        self.logger.info(_connm)
         self.client.loop_start()
 
     def run(self):
-        logging.debug(':: connecting to MQTT broker at {}:{}...'
-                      .format(self.broker_ip, self.broker_port))
+        self.logger.debug(f':: connecting to MQTT broker at {self.broker_ip}:{self.broker_port}')
         self.running = True
 
         self.client = self.init_client()
@@ -142,39 +139,38 @@ class MQTTClient(Process):
         # all seems legit, running loop in separated thread
 
         try:
-            logging.debug('MQTT module starting')
+            self.logger.debug('MQTT module starting')
             while self.running:
                 if self.q_ext.empty():
                     time.sleep(.1)
                 else:
                     message = self.q_ext.get()
                     if message[0] == 'exit':
-                        logging.info('mqtt module stopping...')
+                        self.logger.info('mqtt module stopping...')
                         self.running = False
                     elif message[0] == 'reconnect':
                         self.reconnect(message[1])
                     else:
-                        logging.debug('[SENDING] {}'.format(message))
+                        self.logger.debug(f'[SENDING] {message}')
                         if isinstance(message, tuple):
                             self.client.publish(*message)
                         else:
-                            logging.debug('bad message to publish: {}'
-                                          .format(message))
+                            self.logger.debug(f'bad message to publish: {message}')
         except Exception:
-            logging.exception('catch error in mqtt module: ')
+            self.logger.exception('catch error in mqtt module: ')
         finally:
             self.client.disconnect(self.client, 0)
 
     def reconnect(self, rc: int):
         try:
-            logging.warning(f'unexpected disconnect (code {rc}).\ntrying auto-reconnect...')
+            self.logger.warning(f'unexpected disconnect (code {rc}).\ntrying auto-reconnect...')
             self.is_connected = False
             self.client.loop_stop()
             time.sleep(self.default_timeout)
             # don't want to mess with paho reconnection routines, just recreate the client
             self.client = self.init_client()
             result = self.connect_client()
-            logging.info(result)
+            self.logger.info(result)
             # all seems legit, running loop in separated thread
             self.client.loop_start()
         except Exception:
@@ -206,7 +202,7 @@ class MQTTClient(Process):
         """On disconnect from broker
             TODO: type annotation for userdata
         """
-        logging.info('disconnected from broker')
+        self.logger.info('disconnected from broker')
         rc = int(rc)
         if rc != 0:
             self.q_ext.put(('reconnect', rc))
@@ -219,8 +215,7 @@ class MQTTClient(Process):
            receive message as (str, b'{}'), return dict
            TODO: type annotations for userdata, msg
         """
-        print('[RECEIVE] {}:{}'.format(msg.topic, msg.payload))
-        logging.debug('RECEIVE: {}:{}'.format(msg.topic, msg.payload))
+        self.logger.debug(f'RECEIVE: {msg.topic} {msg.payload}')
 
         try:
             full_topic = msg.topic.split('/')
@@ -236,5 +231,5 @@ class MQTTClient(Process):
                         datahold=payload.get('datahold'))
             event = make_event('mqtt', 'new', data)
             self.q_int.put(event)
-        except BaseException as e:
-            logging.exception('exception occured: {}'.format(e))
+        except BaseException:
+            self.logger.exception('while receiving message')

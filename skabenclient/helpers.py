@@ -91,7 +91,6 @@ class FileLock:
                 time.sleep(.1)
                 with open(self.lock_path, 'w+') as fl:
                     content = fl.read().strip()
-                    print(content)
                     if content != '1':
                         fl.write('1')
                         self.locked = True
