@@ -8,6 +8,7 @@ from skabenclient.helpers import make_event
 
 
 def get_baseconf(root: str, debug: bool = False) -> dict:
+    logsize = 5120000
     fmt = '%(asctime)s :: %(processName)-10s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s'
     min_log_level = 'DEBUG' if debug else 'INFO'
 
@@ -31,14 +32,14 @@ def get_baseconf(root: str, debug: bool = False) -> dict:
             },
             'file': {
                 'class': 'logging.handlers.RotatingFileHandler',
-                'maxBytes': 4096,
+                'maxBytes': logsize,
                 'backupCount': 5,
                 'filename': os.path.join(root, 'messages.log'),
                 'formatter': 'detailed',
             },
             'errors': {
                 'class': 'logging.handlers.RotatingFileHandler',
-                'maxBytes': 4096,
+                'maxBytes': logsize,
                 'backupCount': 3,
                 'filename': os.path.join(root, 'errors.log'),
                 'level': 'ERROR',
@@ -73,7 +74,11 @@ class ReportHandler(logging.handlers.QueueHandler):
 
 class CoreLogger:
 
-    def __init__(self, root: str, logging_queue: Queue, internal_queue: Queue, debug: bool):
+    def __init__(self,
+                 root: str,
+                 logging_queue: Queue,
+                 internal_queue: Queue,
+                 debug: bool):
         self.loggers = []
         self.root_logger = None
         self.logging_queue = logging_queue
@@ -102,7 +107,7 @@ class CoreLogger:
     def make_logger(self, name: str = None, level: int = logging.DEBUG, ext_level: int = None) -> logging.Logger:
         """Make logger from any process"""
         if not name:
-            name = str(os.getpid())
+            name = f'{__name__}-{os.getpid()}'
         instance = logging.getLogger(name)
         if name in self.loggers:
             return instance
@@ -112,4 +117,5 @@ class CoreLogger:
         instance.setLevel(level)
         if ext_level:
             instance = self.add_external_handler(instance, ext_level)
+        instance.propagate = False  # no propagation for logger with QueueHandler
         return instance
