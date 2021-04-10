@@ -74,11 +74,12 @@ class BaseDevice:
 
     def new_timer(self, start: int, count: int, name: str) -> str:
         """Assign timer with given start time, duration and name"""
-        if int(count) > 0:
-            timer = start + count
-            self.timers.update({name: timer})
+        if count > 0:
+            self.timers.update({name: int(round(start + count))})
             self.logger.debug(f"timer set at {start} with name {name} to {count}s")
             return self.timers[name]
+        else:
+            self.logger.error(f'timer {name} cannot be set to 0')
 
     def check_timer(self, name: str, now: int) -> bool:
         """Check if named timer has already expired"""
