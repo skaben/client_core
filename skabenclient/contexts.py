@@ -72,9 +72,9 @@ class BaseContext:
             current = self.device.load()
         return current
 
-    def confirm_update(self, task_id: str, packet_type: str = 'ACK') -> Union[sp.ACK, sp.NACK]:
+    def confirm_update(self, task_id: str, packet_type: str = 'ack') -> Union[sp.ACK, sp.NACK]:
         """ACK/NACK packet"""
-        if packet_type not in ('ACK', 'NACK'):
+        if packet_type not in ('ack', 'nack'):
             raise Exception(f'packet type not ACK or NACK: {packet_type}')
 
         packet_class = getattr(sp, packet_type)
@@ -163,31 +163,31 @@ class EventContext(BaseContext):
         timestamp = event.data.get('timestamp', 0)
         datahold = event.data.get('datahold', {})
 
-        if command == 'WAIT':
+        if command == 'wait':
             # send me to the future
             self.rewrite_timestamp(timestamp + datahold.get('timeout', 10))
             return
 
         if timestamp < self.timestamp:
             # ignoring messages from the past
-            if command not in ('CUP', 'SUP'):
+            if command not in ('cup', 'sup'):
                 return
 
         # update local ts from event
         self.rewrite_timestamp(timestamp)
 
         try:
-            if command == 'PING':
+            if command == 'ping':
                 # reply with pong immediately
                 packet = sp.PONG(topic=self.topic,
                                  uid=self.uid,
                                  timestamp=self.timestamp)
                 self.q_ext.put(packet.encode())
-            elif command == 'CUP':
+            elif command == 'cup':
                 self.mqtt_to_internal(event, 'update')
-            elif command == 'SUP':
+            elif command == 'sup':
                 self.mqtt_to_internal(event, 'sup')
-            elif command == 'INFO':
+            elif command == 'info':
                 self.mqtt_to_internal(event, 'info')
             else:
                 raise Exception(f"unrecognized command: {command}")
@@ -246,7 +246,7 @@ class EventContext(BaseContext):
     def save_config_and_report(self, event: Event):
         """ACK/NACK packet"""
         # todo: add reason field to ACK/NACK
-        response = "ACK"
+        response = "ack"
 
         try:
             task_id = event.data.get("task_id", "missing")
@@ -257,7 +257,7 @@ class EventContext(BaseContext):
             self.device.save(event.data)
             return self.confirm_update(task_id, response)
         except Exception as e:
-            response = 'NACK'
+            response = 'nack'
             self.logger.exception(f'cannot apply new config: {e}')
             return self.confirm_update(task_id, response)
 
