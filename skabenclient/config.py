@@ -119,12 +119,13 @@ class SystemConfig(Config):
         self.root = root if root else os.path.abspath(os.path.dirname(__file__))
         super().__init__(config_path)
 
-        iface = self.data.get('iface')
+        self.DEBUG = self.get('debug')
+        iface = self.get('iface')
 
         if not iface:
             raise Exception('network interface missing in config')
 
-        topic = self.data.get('topic')
+        topic = self.get('topic')
         uid = get_mac(iface)
 
         # set PUB/SUB topics
@@ -143,10 +144,15 @@ class SystemConfig(Config):
             'sub': _subscribe,
         })
 
-        self.log = CoreLogger('device', internal_queue=self.get('q_int'), logging_queue=self.get('q_log'))
+        self.log = CoreLogger(root=self.root,
+                              logging_queue=self.get('q_log'),
+                              internal_queue=self.get('q_int'),
+                              debug=self.DEBUG)
         self.logger_instance = self.log.make_root_logger()
 
-    def logger(self, name: str = None, level: int = logging.DEBUG) -> logging.Logger:
+    def logger(self, name: str = None, level: int = logging.INFO) -> logging.Logger:
+        if self.DEBUG:
+            level = logging.DEBUG
         return self.log.make_logger(name=name, level=level, ext_level=self.get('external_logging'))
 
     def write(self, data: dict = None, mode: str = None) -> PermissionError:
@@ -236,9 +242,12 @@ class DeviceConfigExtended(DeviceConfig):
 
     def __init__(self, config_path: str, system_config: SystemConfig):
         self.system = system_config
+        self.logger = self.system.logger()
         self._update_paths(self.system.get("asset_types", []))
-        self.asset_root = os.path.join(self.system.root, self.system.get('asset_root'))
-
+        asset_root = self.system.get('asset_root')
+        if not asset_root:
+            raise Exception('Assets directory not found. Parameter `asset_root` must be provided in system config')
+        self.asset_root = os.path.join(self.system.root, asset_root)
         if not os.path.exists(self.asset_root):
             os.mkdir(self.asset_root)
         super().__init__(config_path)
@@ -300,16 +309,20 @@ class DeviceConfigExtended(DeviceConfig):
             return to_be_download
 
     def get_file(self, file_data: dict) -> dict:
-        with HTTPLoader(self.system) as loader:
-            path = loader.get_file(file_data["url"], file_data["local_path"])
-            return {file_data["hash"]: path}
+        try:
+            with HTTPLoader(self.system) as loader:
+                path = loader.get_file(file_data["url"], file_data["local_path"])
+                if path:
+                    self.set_file_loaded(file_data["hash"])
+                    return {file_data["hash"]: path}
+        except Exception as e:
+            self.logger.exception(f'while loading file: {e}')
 
     async def download(self, files: List[dict]) -> dict:
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.system.get("max_workers", 3))
         loop = asyncio.get_event_loop()
         for item in files:
             await loop.run_in_executor(executor, self.get_file, item)
-            self.set_file_loaded(item["hash"])
         return self.data["assets"]
 
     def get_files_async(self, files: List[dict]):
@@ -319,8 +332,7 @@ class DeviceConfigExtended(DeviceConfig):
 
     def get_files_sync(self, files: List[dict]):
         for item in files:
-            if self.get_file(item):
-                self.set_file_loaded(item["hash"])
+            self.get_file(item)
         return self.data["assets"]
 
     def set_file_loaded(self, _hash: str):

@@ -7,12 +7,18 @@ from multiprocessing import Queue
 from skabenclient.helpers import make_event
 
 
-def get_baseconf(name: str) -> dict:
+def get_baseconf(root: str, debug: bool = False) -> dict:
+    logsize = 5120000
     fmt = '%(asctime)s :: %(processName)-10s :: <%(filename)s:%(lineno)s - %(funcName)s()>  %(levelname)s > %(message)s'
+    min_log_level = 'DEBUG' if debug else 'INFO'
 
     return {
         'version': 1,
         'formatters': {
+            'short': {
+                'class': 'logging.Formatter',
+                'format': '%(asctime)s :: %(processName)-10s :: %(levelname)s > %(message)s',
+            },
             'detailed': {
                 'class': 'logging.Formatter',
                 'format': fmt
@@ -21,24 +27,27 @@ def get_baseconf(name: str) -> dict:
         'handlers': {
             'console': {
                 'class': 'logging.StreamHandler',
-                'level': 'INFO',
+                'level': min_log_level,
+                'formatter': 'short'
             },
             'file': {
-                'class': 'logging.FileHandler',
-                'filename': f'{name}.log',
-                'mode': 'w',
+                'class': 'logging.handlers.RotatingFileHandler',
+                'maxBytes': logsize,
+                'backupCount': 5,
+                'filename': os.path.join(root, 'messages.log'),
                 'formatter': 'detailed',
             },
             'errors': {
-                'class': 'logging.FileHandler',
-                'filename': f'{name}-errors.log',
-                'mode': 'w',
+                'class': 'logging.handlers.RotatingFileHandler',
+                'maxBytes': logsize,
+                'backupCount': 3,
+                'filename': os.path.join(root, 'errors.log'),
                 'level': 'ERROR',
                 'formatter': 'detailed',
             },
         },
         'root': {
-            'level': 'DEBUG',
+            'level': min_log_level,
             'handlers': ['console', 'file', 'errors']
         },
     }
@@ -65,13 +74,16 @@ class ReportHandler(logging.handlers.QueueHandler):
 
 class CoreLogger:
 
-    def __init__(self, name: str, internal_queue: Queue, logging_queue: Queue):
+    def __init__(self,
+                 root: str,
+                 logging_queue: Queue,
+                 internal_queue: Queue,
+                 debug: bool):
         self.loggers = []
         self.root_logger = None
-        self.name = name or 'device'
         self.logging_queue = logging_queue
         self.internal_queue = internal_queue
-        self.config = get_baseconf(self.name)
+        self.config = get_baseconf(root, debug)
 
     def make_root_logger(self) -> logging.Logger:
         """Make root logger"""
@@ -95,7 +107,7 @@ class CoreLogger:
     def make_logger(self, name: str = None, level: int = logging.DEBUG, ext_level: int = None) -> logging.Logger:
         """Make logger from any process"""
         if not name:
-            name = str(os.getpid())
+            name = f'{__name__}-{os.getpid()}'
         instance = logging.getLogger(name)
         if name in self.loggers:
             return instance
@@ -105,4 +117,5 @@ class CoreLogger:
         instance.setLevel(level)
         if ext_level:
             instance = self.add_external_handler(instance, ext_level)
+        instance.propagate = False  # no propagation for logger with QueueHandler
         return instance

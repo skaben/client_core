@@ -257,6 +257,34 @@ def test_files_get_no_fname(live_server, get_extended_config):
     assert read_bin(remote_path) == read_bin(local_path_result)
 
 
+@pytest.mark.skip(reason='should be fixed')
+def test_files_get_remote_missing(live_server, get_extended_config):
+    asset = "test_missing"
+
+    @live_server.app.route('/test/<filename>')
+    def test_missing(filename):
+        return send_from_directory(REMOTE_DIR, filename)
+
+    live_server.start()
+
+    dev_config = get_extended_config
+    dev_config.asset_paths = {asset: ''}
+    dev_config.make_asset_paths()
+
+    local_path = os.path.join(ASSETS_ROOT, asset, "sound.ogg")
+
+    file_data = {
+        "hash": "12345",
+        "url": url_for("test_missing", filename='missing.ogg', _external=True),
+        "local_path": local_path
+    }
+
+    with pytest.raises(Exception):
+        result = dev_config.get_file(file_data)
+
+    live_server.stop()
+
+
 def gen_file_data(name, url, path, hash=None):
     return {
         "name": name,
