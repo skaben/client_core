@@ -77,7 +77,7 @@ class BaseContext:
         if packet_type not in ('ack', 'nack'):
             raise Exception(f'packet type not ACK or NACK: {packet_type}')
 
-        packet_class = getattr(sp, packet_type)
+        packet_class = getattr(sp, packet_type.upper())
         packet = packet_class(topic=self.config.get('pub'),
                               timestamp=self.timestamp,
                               uid=self.config.get('uid'),
@@ -159,7 +159,7 @@ class EventContext(BaseContext):
            Translate commands into internal event queue
         """
 
-        command = event.data.get('command', '')
+        command = event.data.get('command', '').lower()
         timestamp = event.data.get('timestamp', 0)
         datahold = event.data.get('datahold', {})
 
