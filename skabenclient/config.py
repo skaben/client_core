@@ -116,7 +116,7 @@ class SystemConfig(Config):
 
     def __init__(self, config_path: str = None, root: str = None):
         self.data = {}
-        self.root = root if root else os.path.abspath(os.path.dirname(__file__))
+        self.root = root if root else os.path.abspath(os.getcwd())
         super().__init__(config_path)
 
         self.DEBUG = self.get('debug')
@@ -262,6 +262,7 @@ class DeviceConfigExtended(DeviceConfig):
         return self.asset_paths
 
     def clear_asset_paths(self):
+        """not used in production"""
         try:
             for _dir in self.asset_paths.values():
                 shutil.rmtree(_dir)
