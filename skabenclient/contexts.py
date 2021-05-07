@@ -317,3 +317,4 @@ class Router(Thread):
         """Full stop"""
         self.logger.info('router module stopping...')
         self.running = False
+        raise SystemExit('exiting...')

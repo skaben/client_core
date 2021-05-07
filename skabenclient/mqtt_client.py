@@ -47,6 +47,7 @@ class MQTTClient(Process):
     ch = dict()
     subscriptions_info = ''
     default_timeout = 2
+    running = None
 
     def __init__(self, config: SystemConfig):
         super().__init__()
@@ -90,7 +91,6 @@ class MQTTClient(Process):
         return client
 
     def connect_client(self):
-        exit_message = make_event('device', 'exit')
         tries = 0
         while not self.is_connected:
             if self.running is False:
@@ -107,20 +107,19 @@ class MQTTClient(Process):
                 _errm = f"check system config, client misconfigured.\n"\
                         f"broker_ip: {self.broker_ip} broker_port: {self.broker_port}"
                 self.client.loop_stop()
-                self.q_int.put(exit_message)
+                self.stop()
             except (ConnectionRefusedError, OSError):
                 sleep_time = 30
                 _errm = f'mqtt broker not available, waiting {sleep_time}s'
                 self.logger.error(_errm)
             except MQTTAuthError:
                 self.logger.exception('auth error. check system config ')
-                self.q_int.put(exit_message)
+                self.stop()
             except MQTTProtocolError:
                 self.logger.exception('protocol error. report immediately')
-                self.q_int.put(exit_message)
+                self.stop()
             except Exception:
                 self.logger.exception('exception occured')
-                self.q_int.put(exit_message)
             time.sleep(sleep_time)
 
         _connm = ':: connected to MQTT broker at ' \
@@ -160,6 +159,11 @@ class MQTTClient(Process):
             self.logger.exception('catch error in mqtt module: ')
         finally:
             self.client.disconnect(self.client, 0)
+
+    def stop(self):
+        exit_message = make_event('exit', 'exit')
+        self.q_int.put(exit_message)
+        self.running = False
 
     def reconnect(self, rc: int):
         try:
