@@ -1,13 +1,13 @@
 import os
-import time
 import random
-
+import time
 from threading import Thread
 from typing import Union
 
 from skabenproto import packets as sp
-from skabenclient.helpers import make_event, Event
+
 from skabenclient.config import SystemConfig
+from skabenclient.helpers import Event, make_event
 
 
 class BaseContext:
@@ -72,6 +72,10 @@ class BaseContext:
             current = self.device.load()
         return current
 
+    @property
+    def config_hash(self):
+        return self.config.get('hash')
+
     def confirm_update(self, task_id: str, packet_type: str = 'ack') -> Union[sp.ACK, sp.NACK]:
         """ACK/NACK packet"""
         if packet_type not in ('ack', 'nack'):
@@ -81,7 +85,8 @@ class BaseContext:
         packet = packet_class(topic=self.config.get('pub'),
                               timestamp=self.timestamp,
                               uid=self.config.get('uid'),
-                              task_id=task_id)
+                              task_id=task_id,
+                              config_hash=self.config_hash)
         self.q_ext.put(packet.encode())
         return packet
 
@@ -178,11 +183,8 @@ class EventContext(BaseContext):
 
         try:
             if command == 'ping':
-                # reply with pong immediately
-                packet = sp.PONG(topic=self.topic,
-                                 uid=self.uid,
-                                 timestamp=self.timestamp)
-                self.q_ext.put(packet.encode())
+                pong = self.make_pong_reply()
+                self.q_ext.put(pong)
             elif command == 'cup':
                 self.mqtt_to_internal(event, 'update')
             elif command == 'sup':
@@ -193,6 +195,14 @@ class EventContext(BaseContext):
                 raise Exception(f"unrecognized command: {command}")
         except Exception as e:
             raise Exception(f"[E] MQTT context: {e}")
+
+    def make_pong_reply(self):
+        # reply with pong immediately
+        packet = sp.PONG(topic=self.topic,
+                         uid=self.uid,
+                         timestamp=self.timestamp,
+                         config_hash=self.config_hash)
+        return packet.encode()
 
     def mqtt_to_internal(self, mqtt_event: Event, internal_command: str):
         datahold = mqtt_event.data.get('datahold')
@@ -240,7 +250,8 @@ class EventContext(BaseContext):
                         uid=self.uid,
                         timestamp=self.timestamp,
                         task_id=self.task_id,
-                        datahold=datahold)
+                        datahold=datahold,
+                        config_hash=self.config_hash)
         self.q_ext.put(packet.encode())
 
     def save_config_and_report(self, event: Event):
@@ -316,5 +327,9 @@ class Router(Thread):
     def stop(self):
         """Full stop"""
         self.logger.info('router module stopping...')
+        print('Router exiting gracefully...')
+        exit_message = ("exit", "exit")
+        self.queue_ext.put(exit_message)
+        time.sleep(1)
         self.running = False
-        raise SystemExit('exiting...')
+        print('Router stopped')

@@ -1,11 +1,12 @@
-import os
-import yaml
-import time
+import fcntl
 import logging
-import subprocess
+import os
 import socket
 import struct
-import fcntl
+import subprocess
+import time
+
+import yaml
 
 
 def get_mac(network_iface: str) -> str:

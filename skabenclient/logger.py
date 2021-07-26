@@ -1,9 +1,9 @@
-import os
 import logging
-import logging.handlers
 import logging.config
-
+import logging.handlers
+import os
 from multiprocessing import Queue
+
 from skabenclient.helpers import make_event
 
 

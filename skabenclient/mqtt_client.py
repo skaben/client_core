@@ -1,12 +1,12 @@
 import json
 import time
-
-from typing import Any
 from multiprocessing import Process
+from typing import Any
+
 import paho.mqtt.client as mqtt
 
-from skabenclient.helpers import make_event
 from skabenclient.config import SystemConfig
+from skabenclient.helpers import make_event
 
 
 class MQTTError(Exception):
@@ -145,8 +145,7 @@ class MQTTClient(Process):
                 else:
                     message = self.q_ext.get()
                     if message[0] == 'exit':
-                        self.logger.info('mqtt module stopping...')
-                        self.running = False
+                        self.stop()
                     elif message[0] == 'reconnect':
                         self.reconnect(message[1])
                     else:
@@ -161,6 +160,7 @@ class MQTTClient(Process):
             self.client.disconnect(self.client, 0)
 
     def stop(self):
+        self.logger.info('mqtt module stopping...')
         exit_message = make_event('exit', 'exit')
         self.q_int.put(exit_message)
         self.running = False
