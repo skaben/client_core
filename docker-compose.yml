@@ -6,8 +6,4 @@ services:
       context: .
     volumes:
       - .:/app
-    command: >
-       sh -c "flake8 /app/skabenclient && \
-              pytest /app/skabenclient && \
-              /app/deploy_to_repo.sh"
     env_file: '.env'

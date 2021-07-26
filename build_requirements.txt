@@ -12,3 +12,5 @@ pytest-flask>=1.1.0
 requests>=2.24.0
 flask>=1.1.2
 flake8>=3.8.4
+autoflake
+isort
