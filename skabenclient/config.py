@@ -1,20 +1,18 @@
-import os
-import yaml
 import asyncio
+import collections.abc
+import concurrent.futures
 import logging
 import logging.handlers
-
-import concurrent.futures
 import multiprocessing as mp
+import os
 import shutil
-from typing import Union, List, TextIO, Any
+from typing import Any, List, TextIO, Union
 
+import yaml
 
-from skabenclient.helpers import get_mac, get_ip, FileLock
+from skabenclient.helpers import FileLock, get_ip, get_mac
+from skabenclient.loaders import HTTPLoader, get_yaml_loader
 from skabenclient.logger import CoreLogger
-from skabenclient.loaders import get_yaml_loader, HTTPLoader
-
-import collections.abc
 
 ExtendedLoader = get_yaml_loader()
 _mapping = collections.abc.Mapping
@@ -27,8 +25,14 @@ class Config:
         Provides methods for reading and writing .yml config file with filelock
     """
 
-    not_stored_keys = list()  # fields should not be stored in .yml
-    minimal_essential_conf = dict()  # essential config
+    # essential config
+    minimal_essential_conf = dict()
+
+    # fields should not be stored in .yml
+    not_stored_keys = [
+        "FORCE",
+        "NESTED"
+    ]
 
     def __init__(self, config_path: str):
         self.data = dict()
@@ -78,11 +82,16 @@ class Config:
     def update(self, payload: dict) -> dict:
         """Updates local namespace from payload with basic filtering"""
         update_target = self.data
-        # destructive update
         if payload.get("FORCE"):
-            payload.pop("FORCE")
+            # destructive update
             update_target = self.minimal_essential_conf
-        self.data = self._update_nested(update_target, self._filter(payload))
+            self.files_local = {}
+            self.data = update_target.update({**self._filter(payload)})
+        elif payload.get("NESTED"):
+            # nested update
+            self.data = self._update_nested(update_target, self._filter(payload))
+        else:
+            self.data = {**self._filter(payload)}
         return self.data
 
     def _update_nested(self, target: dict, update: _mapping) -> dict:
@@ -239,6 +248,7 @@ class DeviceConfigExtended(DeviceConfig):
     }
 
     asset_paths = {}  # directory paths by file types
+    files_local = {}
 
     def __init__(self, config_path: str, system_config: SystemConfig):
         self.system = system_config
@@ -278,15 +288,13 @@ class DeviceConfigExtended(DeviceConfig):
     def parse_files(self, files: dict) -> dict:
         if not self.asset_paths:
             raise Exception("asset directories was not created, run DeviceConfig.make_asset_paths(asset_dirs) first!")
-
+        not_loaded = {}
         if files and isinstance(files, dict):
-            to_be_download = {}
             assets = self.get('assets', {})
 
-            for file_data in list(files.items()):
-                _hash, url = file_data
+            for _hash, url in files.items():
                 exists = assets.get(_hash)
-                if exists and exists.get('loaded') is True:
+                if exists and self.files_local.get(_hash):
                     continue
 
                 file_type, orig_name = url.split("/")[-2:]
@@ -297,17 +305,16 @@ class DeviceConfigExtended(DeviceConfig):
                 if not local_dir:
                     raise Exception(f"no local directory was created for `{file_type}` type of files")
 
-                to_be_download.update({
+                not_loaded.update({
                     _hash: {
                         "local_path": os.path.join(local_dir, orig_name),
                         "hash": _hash,
                         "url": url,
                         "file_type": file_type,
-                        "loaded": False
                     }
                 })
-            self.update({"assets": to_be_download})
-            return to_be_download
+                self.update({"assets": not_loaded, "NESTED": True})
+        return not_loaded
 
     def get_file(self, file_data: dict) -> dict:
         try:
@@ -337,13 +344,7 @@ class DeviceConfigExtended(DeviceConfig):
         return self.data["assets"]
 
     def set_file_loaded(self, _hash: str):
-        self.update({
-            "assets": {
-                _hash: {
-                    "loaded": True
-                }
-            }
-        })
+        self.files_local[_hash] = _hash
 
     def get_json(self, url: str) -> dict:
         with HTTPLoader(self.system) as loader:
