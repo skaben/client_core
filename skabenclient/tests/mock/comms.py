@@ -1,5 +1,6 @@
 import json
 
+
 class MockMessage:
 
     def __init__(self, packet):

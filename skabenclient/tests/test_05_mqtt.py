@@ -1,8 +1,7 @@
 import pytest
 
-from skabenclient.mqtt_client import MQTTClient
 from skabenclient.config import SystemConfig
-
+from skabenclient.mqtt_client import MQTTClient
 from skabenclient.tests.mock.comms import MockMessage, MockQueue
 
 test_message_content = (

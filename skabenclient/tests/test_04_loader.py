@@ -1,10 +1,11 @@
 import os
 import shutil
-import pytest
-import pygame as pg
 
-from skabenclient.loaders import SoundLoader           
+import pygame as pg
+import pytest
+
 import skabenclient.tests.mock.mixer as mock_mixer
+from skabenclient.loaders import SoundLoader
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 

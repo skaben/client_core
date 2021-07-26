@@ -1,15 +1,13 @@
-import pytest
 import time
-import json
+
+import pytest
 
 import skabenclient.contexts as mgr
-
-from skabenclient.config import SystemConfig, DeviceConfig
+from skabenclient.config import DeviceConfig, SystemConfig
 from skabenclient.device import BaseDevice
 from skabenclient.helpers import make_event
-
 from skabenclient.tests.mock.comms import MockMessage
-from skabenclient.tests.mock.data import yaml_content_as_dict, base_config
+from skabenclient.tests.mock.data import base_config, yaml_content_as_dict
 
 
 @pytest.fixture
@@ -57,7 +55,7 @@ def test_event_context_update(event_setup, monkeypatch):
     devconf.data = {}  # clean up config
     test_conf = devconf.load()  # reread from file
 
-    assert result.get('response') == 'ACK'
+    assert result.get('response') == 'ack'
     assert result.get('task_id') == 123123
     assert test_conf.get('value') == 'newval'
 
@@ -122,7 +120,7 @@ def test_event_context_send_config(event_setup, monkeypatch, default_config):
         context.send_config(_dict)
         message = MockMessage(in_queue[-1])
 
-    packet_topic = '/'.join((context.topic, syscfg.get('uid'), 'SUP'))
+    packet_topic = '/'.join((context.topic, syscfg.get('uid'), 'sup'))
     assert message.topic == packet_topic, 'wrong message topic'
     assert message.decoded.get('timestamp') == 0, f'wrong device timestamp {message.decoded}'
     assert message.decoded['datahold'].get('new_value') == _dict.get('new_value'), f'bad data send: {message.decoded}'
@@ -162,7 +160,7 @@ def test_event_context_send_config_from_event_with_data(event_setup, monkeypatch
         else:
             message = MockMessage(in_queue[-1])
 
-    packet_topic = '/'.join((context.topic, syscfg.get('uid'), 'SUP'))
+    packet_topic = '/'.join((context.topic, syscfg.get('uid'), 'sup'))
     assert message.topic == packet_topic, 'wrong message topic'
     assert message.decoded.get('timestamp') == 0, f'wrong device timestamp {message.decoded}'
     assert message.decoded['datahold'].get(key) == expected, f'{key}, {expected} > bad data send: {message.decoded}'
@@ -195,7 +193,7 @@ def test_event_context_send_config_request_keys(event_setup, default_config, mon
         assert message.decoded['datahold'].get('request') == _keys
 
 
-@pytest.mark.parametrize('cmd', ('ACK', 'NACK',))
+@pytest.mark.parametrize('cmd', ('ack', 'nack',))
 def test_event_context_confirm_update_ack(event_setup, default_config, monkeypatch, cmd):
     dev_dict = {**default_config('dev'), **{'test_key': 'test_value', 'task_id': '12345'}}
     syscfg = event_setup(dev_config=dev_dict)

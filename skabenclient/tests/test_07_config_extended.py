@@ -1,11 +1,10 @@
 import os
 import shutil
+
 import pytest
-from flask import url_for, send_from_directory, jsonify
+from flask import jsonify, send_from_directory, url_for
 
-from skabenclient.loaders import HTTPLoader
-from skabenclient.config import SystemConfig, DeviceConfigExtended, DeviceConfig
-
+from skabenclient.config import DeviceConfig, DeviceConfigExtended, SystemConfig
 
 REMOTE_DIR = os.path.join(os.path.dirname(__file__), "res")
 LOCAL_DIR = os.path.join(os.path.dirname(__file__), "temp")
@@ -165,7 +164,6 @@ def test_files_parse_normal(get_extended_config, get_file_vars):
     assert pick.get("hash") == key
     assert pick.get("url") == url
     assert pick.get("local_path") == os.path.join(local_dir, fname)
-    assert pick.get("loaded") is False
     assert pick.get("file_type") == dirname
     assert dev_config.data["assets"][key]["url"] == url
 
@@ -187,13 +185,12 @@ def test_files_parse_local_file_asset_exists(get_extended_config, get_file_vars)
 
     dev_config = get_extended_config
     dev_config.make_asset_paths()
-    assets = dev_config.data['assets']
-    test_dict = {"loaded": True}
-    assets[key] = test_dict
-    dev_config.parse_files({key: url})
+    dev_config.data['assets'] = {key: {'test': 'file'}}
+    dev_config.set_file_loaded(key)
 
-    assert assets[key]
-    assert not assets[key].get("url")
+    assert dev_config.data['assets'].get(key)
+    assert dev_config.files_local.get(key)
+    assert dev_config.parse_files({key: url}) == {}, 'file parsed twice'
 
 
 def test_files_get(live_server, get_extended_config):
@@ -214,7 +211,7 @@ def test_files_get(live_server, get_extended_config):
     local_path = os.path.join(ASSETS_ROOT, asset, "sound.ogg")
 
     file_data = {
-        "hash": "12345",
+        "hash": "g3w345QE",
         "url": url_for("test_a", filename=fname, _external=True),
         "local_path": local_path
     }
@@ -244,7 +241,7 @@ def test_files_get_no_fname(live_server, get_extended_config):
     live_server.start()
 
     file_data = {
-        "hash": "12345",
+        "hash": "g3w345QE",
         "url": url_for(asset, filename=fname, _external=True),
         "local_path": local_path
     }
@@ -274,13 +271,13 @@ def test_files_get_remote_missing(live_server, get_extended_config):
     local_path = os.path.join(ASSETS_ROOT, asset, "sound.ogg")
 
     file_data = {
-        "hash": "12345",
+        "hash": "g3w345QE",
         "url": url_for("test_missing", filename='missing.ogg', _external=True),
         "local_path": local_path
     }
 
     with pytest.raises(Exception):
-        result = dev_config.get_file(file_data)
+        dev_config.get_file(file_data)
 
     live_server.stop()
 
@@ -321,6 +318,7 @@ def test_files_get_sync(live_server, get_extended_config):
                              os.path.join(local_path, f"{name}.snd"))
 
     download = [get_data(name) for name in file_list]
+    dev_config.make_asset_paths(ASSET_PATHS)
 
     _as = dev_config.data["assets"]
     for item in download:
@@ -329,9 +327,9 @@ def test_files_get_sync(live_server, get_extended_config):
 
     for file in file_list:
         local_file = os.path.join(local_path, f"{file}.snd")
-        assert _as[file]["loaded"]
         assert _as[file]["hash"] == file
         assert _as[file]["local_path"] == local_file
+        assert dev_config.files_local.get(file), dev_config.files_local
         assert remote_data == read_bin(local_file)
 
     live_server.stop()
@@ -364,6 +362,7 @@ def test_files_get_async(live_server, get_extended_config):
                              os.path.join(local_path, f"{name}.snd"))
 
     download = [get_data(name) for name in file_list]
+    dev_config.make_asset_paths(ASSET_PATHS)
 
     _as = dev_config.data["assets"]
     for item in download:
@@ -372,7 +371,7 @@ def test_files_get_async(live_server, get_extended_config):
 
     for file in file_list:
         local_file = os.path.join(local_path, f"{file}.snd")
-        assert _as[file]["loaded"]
+        assert dev_config.files_local.get(file)
         assert _as[file]["hash"] == file
         assert _as[file]["local_path"] == local_file
         assert remote_data == read_bin(local_file)
@@ -505,7 +504,6 @@ def test_full_config(live_server, get_extended_config):
         fhash: {
             'file_type': ftype,
             'hash': fhash,
-            'loaded': True,
             'local_path': os.path.join(ASSETS_ROOT, ftype, fname),
             'url': file_url,
         }

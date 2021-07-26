@@ -1,12 +1,10 @@
 import pytest
 
-from skabenclient.tests.mock.logger import MockLogger
-from skabenclient.tests.mock.data import base_config, yaml_content_as_dict
-
+from skabenclient.config import DeviceConfig, SystemConfig
 from skabenclient.device import BaseDevice
 from skabenclient.helpers import make_event
-from skabenclient.config import SystemConfig, DeviceConfig
-
+from skabenclient.tests.mock.data import base_config, yaml_content_as_dict
+from skabenclient.tests.mock.logger import MockLogger
 
 test_complex_dict = {"complex": yaml_content_as_dict}
 

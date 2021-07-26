@@ -1,11 +1,11 @@
 import os
+
 import pytest
 import requests
-from flask import url_for, send_from_directory
+from flask import send_from_directory, url_for
 
-from skabenclient.loaders import HTTPLoader
 from skabenclient.config import SystemConfig
-
+from skabenclient.loaders import HTTPLoader
 
 REMOTE_DIR = os.path.join(os.path.dirname(__file__), "res")
 LOCAL_DIR = os.path.join(os.path.dirname(__file__), "temp")

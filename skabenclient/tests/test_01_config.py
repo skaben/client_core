@@ -1,13 +1,14 @@
+import logging
 import os
 import time
-import yaml
-import pytest
-import logging
 
-from skabenclient.config import Config, SystemConfig, DeviceConfig, FileLock
-from skabenclient.loaders import get_yaml_loader
-from skabenclient.tests.mock.data import yaml_content, yaml_content_as_dict, base_config
+import pytest
+import yaml
+
+from skabenclient.config import Config, DeviceConfig, FileLock, SystemConfig
 from skabenclient.helpers import Event
+from skabenclient.loaders import get_yaml_loader
+from skabenclient.tests.mock.data import base_config, yaml_content, yaml_content_as_dict
 
 
 @pytest.fixture(autouse=True)
@@ -376,7 +377,7 @@ def test_file_lock_busy(get_config, monkeypatch, config_dict):
     monkeypatch.setattr(time, 'sleep', lambda x: None)
     file_lock = FileLock(cfg.config_path, timeout=.1)
     with file_lock:
-        res = file_lock.acquire()
+        file_lock.acquire()
         with pytest.raises(Exception):
             assert cfg.write()
             assert cfg.read()

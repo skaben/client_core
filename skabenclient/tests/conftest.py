@@ -1,9 +1,9 @@
-import os
-import yaml
-import pytest
 import hashlib
-from flask import Flask
+import os
 
+import pytest
+import yaml
+from flask import Flask
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
