@@ -27,6 +27,7 @@ class Config:
 
     # essential config
     minimal_essential_conf = dict()
+    files_local = dict()
 
     # fields should not be stored in .yml
     not_stored_keys = [
@@ -86,12 +87,12 @@ class Config:
             # destructive update
             update_target = self.minimal_essential_conf
             self.files_local = {}
-            self.data = update_target.update({**self._filter(payload)})
+            self.data = update_target.update(**self._filter(payload))
         elif payload.get("NESTED"):
             # nested update
             self.data = self._update_nested(update_target, self._filter(payload))
         else:
-            self.data = {**self._filter(payload)}
+            self.data.update(**self._filter(payload))
         return self.data
 
     def _update_nested(self, target: dict, update: _mapping) -> dict:
@@ -115,7 +116,7 @@ class Config:
 
     def _filter(self, payload: dict) -> Union[dict, bool]:
         """Filter keys starting with underscore and by filtered keys list"""
-        return {k: v for k, v in payload.items() if not k.startswith('_') and k not in self.not_stored_keys}
+        return {k: v for k, v in payload.items() if k not in self.not_stored_keys or not k.startswith('_')}
 
 
 class SystemConfig(Config):
