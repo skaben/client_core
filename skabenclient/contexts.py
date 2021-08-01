@@ -74,7 +74,7 @@ class BaseContext:
 
     @property
     def config_hash(self):
-        return self.config.get('hash')
+        return self.device.config.get('hash')
 
     def confirm_update(self, task_id: str, packet_type: str = 'ack') -> Union[sp.ACK, sp.NACK]:
         """ACK/NACK packet"""
