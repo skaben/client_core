@@ -83,7 +83,7 @@ def test_config_update_nested(get_config):
     after = {'nested_two': val*2}
 
     nested = {'test': {'main': before}}
-    new_nested = {'test': {'main': after}}
+    new_nested = {'test': {'main': after}, 'NESTED': True}
 
     cfg = get_config(Config, nested)
     cfg.update(new_nested)
@@ -92,7 +92,7 @@ def test_config_update_nested(get_config):
     assert cfg.data['test']['main']['nested'] == val, 'nested update has failed'
 
 
-def test_config_update_nested_force(get_config):
+def test_config_update_force(get_config):
     val = 'value'
     nested = {'test': {'main': {'nested': val}}}
     new_nested = {'test': {'main': {'nested_two': val}}, 'FORCE': True}

@@ -9,6 +9,12 @@ import time
 import yaml
 
 
+def set_destructive(payload: dict) -> dict:
+    """CUP packet rewrites client config from scratch"""
+    payload.update(FORCE=True)
+    return payload
+
+
 def get_mac(network_iface: str) -> str:
     """Get MAC-address of given network interface"""
     try:

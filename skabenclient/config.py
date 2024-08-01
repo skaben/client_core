@@ -87,7 +87,7 @@ class Config:
             # destructive update
             update_target = self.minimal_essential_conf
             self.files_local = {}
-            self.data = update_target.update(**self._filter(payload))
+            self.data = {**self.minimal_essential_conf, **self._filter(payload)}
         elif payload.get("NESTED"):
             # nested update
             self.data = self._update_nested(update_target, self._filter(payload))

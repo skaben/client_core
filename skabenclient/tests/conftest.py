@@ -3,7 +3,6 @@ import os
 
 import pytest
 import yaml
-from flask import Flask
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -13,7 +12,7 @@ def get_root():
 
 
 def _iface():
-    stream = os.popen(f"ip route | grep 'default' | sed -nr 's/.*dev ([^\ ]+).*/\\1/p'")
+    stream = os.popen("ip route | grep 'default' | sed -nr 's/.*dev ([^\\ ]+).*/\\1/p'")
     iface_name = stream.read()
     stream.close()
     return iface_name.rstrip()
@@ -133,9 +132,3 @@ def get_hash():
         return hash
 
     return _wrap
-
-
-@pytest.fixture(scope="session")
-def app():
-    app = Flask(__name__)
-    return app

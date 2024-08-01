@@ -1,4 +1,4 @@
-FROM python:3.7-slim as base
+FROM python:3.12-slim as base
 MAINTAINER zerthmonk
 
 ENV PYTHONUBUFFERED=1
@@ -12,10 +12,10 @@ FROM base as builder
 
 WORKDIR /app
 
-COPY build_requirements.txt /build_requirements.txt
+COPY requirements.txt /requirements.txt
 
 RUN python -m pip install --upgrade pip && \
-    python -m pip install -r /build_requirements.txt
+    python -m pip install -r /requirements.txt
 
 COPY lint.sh /lint.sh
 RUN chmod +x /lint.sh

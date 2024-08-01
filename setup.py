@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 with open("README.md", 'r') as f:
     long_description = f.read()
@@ -9,13 +9,13 @@ with open('requirements.txt', 'r') as f:
 
 setup(
     name='skabenclient',
-    version='1.17.2',
-    description='SKABEN client ',
+    version='1.18',
+    description='SKABEN client',
     license="MIT",
     long_description=long_description,
     author='Zerthmonk',
     author_email='zerthmonk@pm.me',
-    url="dungeon.tangled.link",
+    url="dungeon.magos.cc",
     packages=['skabenclient'], 
     install_requires=requirements_list,
     dependency_links=[

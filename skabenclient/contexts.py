@@ -4,7 +4,7 @@ import time
 from threading import Thread
 from typing import Union
 
-from skabenproto import packets as sp
+import packets as sp
 
 from skabenclient.config import SystemConfig
 from skabenclient.helpers import Event, make_event
