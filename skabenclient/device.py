@@ -14,10 +14,6 @@ class BaseDevice:
     timers = {}
 
     def __init__(self, app_config: SystemConfig, device_config: DeviceConfig):
-        if not isinstance(app_config, SystemConfig):
-            raise Exception(f'app_config is not a SystemConfig, but {type(app_config)} instead')
-        if not isinstance(device_config, self.config_class):
-            raise Exception(f'device_config is not a {self.config_class}, but {type(device_config)} instead')
         # assign system config
         self.system = app_config
         self.q_int = app_config.get('q_int')
